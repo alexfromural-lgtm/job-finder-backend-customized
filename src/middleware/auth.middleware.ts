@@ -4,10 +4,9 @@ import { Role } from "@prisma/client";
 
 export interface AuthRequest extends Request {
     userId? : string,
-	role?: Role
+	roles?: Role[]
 }
 
-// 🔒 For regular authenticated users (after full login)
 export const requireAuth = (
 	req: AuthRequest,
 	res: Response,
@@ -25,7 +24,7 @@ export const requireAuth = (
 	try {
 		const payload = verifyAccessToken(token);
 		req.userId = payload.userId;
-		req.role = payload.role;
+		req.roles = payload.roles;
 		next();
 	} catch {
 		res.status(401).json({ error: 'Invalid or expired access token' });
@@ -34,9 +33,10 @@ export const requireAuth = (
 
 export const authorizeRoles = (...roles: Role[]) => {
 	return (req: AuthRequest, res: Response, next: NextFunction) => {
-		if (!roles.includes(req.role!)) {
-      		res.status(403).json({ message: "Access denied." });
-    	}
+		if (!req.roles || !req.roles.some(role => roles.includes(role))) {
+			res.status(403).json({ message: "Access denied." });
+			return;
+		}
 		next();
 	};
 }

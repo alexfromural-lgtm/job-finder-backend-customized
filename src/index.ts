@@ -4,6 +4,8 @@ import cors from "cors";
 import dotenv from "dotenv";
 import authRoutes from "./routes/auth.route";
 import jobseekerRoutes from "./routes/jobseeker.route";
+import recruiterRoutes from "./routes/recruiter.route";
+import jobRoutes from "./routes/job.route";
 
 dotenv.config();
 
@@ -15,6 +17,8 @@ app.use(cookieParser());
 
 app.use("/api/auth", authRoutes);
 app.use("/api/jobseeker", jobseekerRoutes);
+app.use("/api/recruiter", recruiterRoutes);
+app.use("/api/jobs", jobRoutes);
 
 const PORT = process.env.PORT || 5002;
 

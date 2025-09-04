@@ -1,10 +1,9 @@
 import { z } from "zod";
 
-export const profileSchema = z.object({
-  bio: z.string().min(1).max(500).optional(),
-  location: z.string().min(1).max(500).optional(),
-  skills: z.array(z.string().min(1)).optional(),
-  education: z.string().min(1).max(500).optional(),
-  experience: z.string().min(1).max(500).optional(),
-  resumeUrl: z.string().min(1).max(500).optional(),
-}).strict();
+export const signupSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  email: z.email("Invalid email"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+});
+
+export type SignupInput = z.infer<typeof signupSchema>;
