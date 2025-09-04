@@ -1,7 +1,7 @@
 import prisma from "../prisma/client";
 
-export const getJobSeekerProfile = async (userId: string) => {
-  const profile = await prisma.jobSeekerProfile.findUnique({
+export const getRecruiterProfile = async (userId: string) => {
+  const profile = await prisma.recruiterProfile.findUnique({
     where: { userId },
     include: {
       user: {
