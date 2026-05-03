@@ -1,7 +1,11 @@
 import { Role } from "@prisma/client";
 import prisma from "../prisma/client";
 import { comparePasswords, hashPassword } from "../utils/hash";
-import { generateAccessToken, generateRefreshToken } from "../utils/token";
+import {
+  generateAccessToken,
+  generateRefreshToken,
+  verifyRefreshToken,
+} from "../utils/token";
 import { RecruiterSignupInput } from "../validators/recruiter.schema";
 
 export const signupJobSeeker = async (
@@ -78,7 +82,7 @@ export const signupRecruitor = async (data: RecruiterSignupInput) => {
   return { accessToken, refreshToken };
 };
 
-export const upgradeToRecruiter = async(userId: string, data: RecruiterSignupInput) => {
+export const upgradeToRecruiter = async (userId: string, data: RecruiterSignupInput) => {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: { recruiter: true },
@@ -104,7 +108,7 @@ export const upgradeToRecruiter = async(userId: string, data: RecruiterSignupInp
   });
 
   return updatedUser;
-}
+};
 
 export const login = async (email: string, password: string) => {
   if (!email || !password) throw new Error("Email and Password required");
@@ -122,6 +126,19 @@ export const login = async (email: string, password: string) => {
   return { accessToken, refreshToken };
 };
 
+export const refreshTokens = async (refreshToken: string) => {
+  const payload = verifyRefreshToken(refreshToken);
+
+  const user = await prisma.user.findUnique({ where: { id: payload.userId } });
+  if (!user) throw new Error("User not found");
+  if (!user.isActive) throw new Error("Account is deactivated");
+
+  const newAccessToken = generateAccessToken(user.id, user.roles);
+  const newRefreshToken = generateRefreshToken(user.id, user.roles);
+
+  return { accessToken: newAccessToken, refreshToken: newRefreshToken };
+};
+
 export const getCurrentUser = async (userId: string) => {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -129,6 +146,9 @@ export const getCurrentUser = async (userId: string) => {
       id: true,
       name: true,
       email: true,
+      roles: true,
+      isActive: true,
+      createdAt: true,
     },
   });
 

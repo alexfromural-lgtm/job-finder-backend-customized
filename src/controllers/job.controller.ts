@@ -1,60 +1,52 @@
-import { Request, Response } from "express";
+import { Response } from "express";
+import { AuthRequest } from "../middleware/auth.middleware";
 import * as JobService from "../services/job.service";
-import * as Recruiter from "../services/recruiter.service";
+import * as RecruiterService from "../services/recruiter.service";
 
-export const getJobsByRecruiter = async (req: Request, res: Response) => {
+export const getJobsByRecruiter = async (req: AuthRequest, res: Response) => {
   try {
-    const userId = (req as any).userId;
+    const userId = req.userId!;
 
-    if (!userId) res.status(401).json({ error: "Unauthorized" });
-
-    const recruiter = await Recruiter.getRecruiterProfile(userId);
+    const recruiter = await RecruiterService.getRecruiterProfile(userId);
     if (!recruiter) {
-      throw new Error("Recruiter profile not found. Please create one first.");
+      res.status(404).json({ error: "Recruiter profile not found. Please create one first." });
+      return;
     }
 
     const jobs = await JobService.getJobsByRecruiter(recruiter.id);
-
-    if (!jobs) res.status(404).json({ error: "No jobs found" });
-
     res.status(200).json({ data: jobs });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 };
 
-export const createJob = async (req: Request, res: Response) => {
+export const createJob = async (req: AuthRequest, res: Response) => {
   try {
-    const userId = (req as any).userId;
+    const userId = req.userId!;
     const jobData = req.body;
 
-    if (!userId) res.status(401).json({ error: "Unauthorized" });
-
-    const recruiter = await Recruiter.getRecruiterProfile(userId);
-
+    const recruiter = await RecruiterService.getRecruiterProfile(userId);
     if (!recruiter) {
-      throw new Error("Recruiter profile not found. Please create one first.");
+      res.status(404).json({ error: "Recruiter profile not found. Please create one first." });
+      return;
     }
 
     const job = await JobService.createJob(recruiter.id, jobData);
-
-    if (!job) res.status(400).json({ error: "Job creation failed" });
-
     res.status(201).json({ message: "Job created successfully!", data: job });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 };
 
-export const getJobById = async (req: Request, res: Response) => {
+export const getJobById = async (req: AuthRequest, res: Response) => {
   try {
     const jobId = req.params.id;
-
-    if (!jobId) res.status(400).json({ error: "Job ID is required" });
-
     const job = await JobService.getJobById(jobId);
 
-    if (!job) res.status(404).json({ error: "Job not found" });
+    if (!job) {
+      res.status(404).json({ error: "Job not found" });
+      return;
+    }
 
     res.status(200).json({ data: job });
   } catch (err: any) {
@@ -62,42 +54,54 @@ export const getJobById = async (req: Request, res: Response) => {
   }
 };
 
-export const updateJob = async (req: Request, res: Response) => {
+export const updateJob = async (req: AuthRequest, res: Response) => {
   try {
+    const userId = req.userId!;
     const jobId = req.params.id;
     const jobData = req.body;
 
-    if (!jobId) res.status(400).json({ error: "Job ID is required" });
+    const recruiter = await RecruiterService.getRecruiterProfile(userId);
+    if (!recruiter) {
+      res.status(404).json({ error: "Recruiter profile not found" });
+      return;
+    }
 
-    if (!jobData) res.status(400).json({ error: "Job data is required" });
-
-    const job = await JobService.updateJob(jobId, jobData);
-
-    if (!job) res.status(404).json({ error: "Job not found" });
-
+    const job = await JobService.updateJob(jobId, recruiter.id, jobData);
     res.status(200).json({ message: "Job updated successfully!", data: job });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    const status = err.message.includes("not authorized") ? 403 : 400;
+    res.status(status).json({ error: err.message });
   }
 };
 
-export const deleteJob = async (req: Request, res: Response) => {
+export const deleteJob = async (req: AuthRequest, res: Response) => {
   try {
+    const userId = req.userId!;
     const jobId = req.params.id;
 
-    if (!jobId) res.status(400).json({ error: "Job ID is required" });
+    const recruiter = await RecruiterService.getRecruiterProfile(userId);
+    if (!recruiter) {
+      res.status(404).json({ error: "Recruiter profile not found" });
+      return;
+    }
 
-    await JobService.deleteJob(jobId);
-
+    await JobService.deleteJob(jobId, recruiter.id);
     res.status(200).json({ message: "Job deleted successfully!" });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    const status = err.message.includes("not authorized") ? 403 : 400;
+    res.status(status).json({ error: err.message });
   }
 };
 
-export const getAllJobs = async (req: Request, res: Response) => {
+export const getAllJobs = async (req: AuthRequest, res: Response) => {
   try {
-    const jobs = await JobService.getAllJobs();
+    const { category, location, search } = req.query as {
+      category?: string;
+      location?: string;
+      search?: string;
+    };
+
+    const jobs = await JobService.getAllJobs({ category, location, search });
     res.status(200).json({ data: jobs });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

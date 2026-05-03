@@ -16,6 +16,7 @@ export const generateRefreshToken = (userId: string, roles: Role[]) => {
 export const verifyRefreshToken = (token: string) => {
 	return jwt.verify(token, process.env.REFRESH_TOKEN_SECRET!) as {
 		userId: string;
+		roles: Role[];
 	};
 };
 

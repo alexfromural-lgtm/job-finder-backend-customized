@@ -1,15 +1,16 @@
-import { Request, Response } from "express";
+import { Response } from "express";
+import { AuthRequest } from "../middleware/auth.middleware";
 import * as JobseekerService from "../services/jobseeker.service";
 
-export const getProfile = async (req: Request, res: Response) => {
+export const getProfile = async (req: AuthRequest, res: Response) => {
   try {
-    const userId = (req as any).userId;
-
-    if (!userId) res.status(401).json({ error: "Unauthorized" });
-
+    const userId = req.userId!;
     const profile = await JobseekerService.getJobSeekerProfile(userId);
 
-    if (!profile) res.status(404).json({ error: "Profile not found" });
+    if (!profile) {
+      res.status(404).json({ error: "Profile not found" });
+      return;
+    }
 
     res.status(200).json({ profile });
   } catch (err: any) {
@@ -17,3 +18,84 @@ export const getProfile = async (req: Request, res: Response) => {
   }
 };
 
+export const updateProfile = async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!;
+    const profile = await JobseekerService.updateJobSeekerProfile(userId, req.body);
+    res.status(200).json({ profile });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+export const applyToJob = async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!;
+    const jobId = req.params.jobId;
+    const { coverLetter } = req.body;
+
+    const application = await JobseekerService.applyToJob(userId, jobId, coverLetter);
+    res.status(201).json({ application });
+  } catch (err: any) {
+    const status = err.message.includes("already applied") ? 409 : 400;
+    res.status(status).json({ error: err.message });
+  }
+};
+
+export const getApplications = async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!;
+    const data = await JobseekerService.getApplications(userId);
+    res.status(200).json({ data });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+export const withdrawApplication = async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!;
+    const applicationId = req.params.id;
+
+    await JobseekerService.withdrawApplication(userId, applicationId);
+    res.status(200).json({ message: "Application withdrawn successfully" });
+  } catch (err: any) {
+    const status = err.message.includes("not authorized") ? 403 : 404;
+    res.status(status).json({ error: err.message });
+  }
+};
+
+export const saveJob = async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!;
+    const jobId = req.params.jobId;
+
+    const savedJob = await JobseekerService.saveJob(userId, jobId);
+    res.status(201).json({ savedJob });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+};
+
+export const getSavedJobs = async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!;
+    const data = await JobseekerService.getSavedJobs(userId);
+    res.status(200).json({ data });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+export const unsaveJob = async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!;
+    const jobId = req.params.jobId;
+
+    await JobseekerService.unsaveJob(userId, jobId);
+    res.status(200).json({ message: "Job removed from saved list" });
+  } catch (err: any) {
+    const status = err.message.includes("not found") ? 404 : 400;
+    res.status(status).json({ error: err.message });
+  }
+};

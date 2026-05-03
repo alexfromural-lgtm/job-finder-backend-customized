@@ -1,5 +1,4 @@
 import { Router } from "express";
-
 import { authorizeRoles, requireAuth } from "../middleware/auth.middleware";
 import { validate } from "../middleware/validate.middleware";
 import { jobSchema } from "../validators/job.schema";
@@ -7,6 +6,11 @@ import * as JobController from "../controllers/job.controller";
 
 const router = Router();
 
+// Public
+router.get("/all", JobController.getAllJobs);
+router.get("/:id", JobController.getJobById);
+
+// Recruiter only
 router.post(
   "/",
   requireAuth,
@@ -15,8 +19,6 @@ router.post(
   JobController.createJob
 );
 
-router.get("/all", JobController.getAllJobs);
-
 router.get(
   "/recruiter",
   requireAuth,
@@ -24,16 +26,11 @@ router.get(
   JobController.getJobsByRecruiter
 );
 
-router.get(
-  "/:id",
-  JobController.getJobById
-);
-
 router.put(
   "/:id",
   requireAuth,
-  authorizeRoles(),
-  validate(jobSchema.partial()), 
+  authorizeRoles("RECRUITER"),
+  validate(jobSchema.partial()),
   JobController.updateJob
 );
 
