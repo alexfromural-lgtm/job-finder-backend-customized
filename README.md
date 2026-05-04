@@ -96,4 +96,9 @@ psql -U job_finder_user -d job_finder
 # Press Enter, then type: secure_password_123
 
 How to see if somobidy using the same port
+```bash
 netstat -ano | findstr :5432
+
+// Seed DB inside Docker
+```bash
+docker exec job-finder-backend npx prisma db seed

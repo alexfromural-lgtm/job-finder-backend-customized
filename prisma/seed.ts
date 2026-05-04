@@ -7,9 +7,13 @@ async function main() {
   console.log("🌱 Starting seed...");
 
   // Clean up existing data for a fresh seed
+  await prisma.report.deleteMany();
+  await prisma.notification.deleteMany();
   await prisma.savedJob.deleteMany();
   await prisma.application.deleteMany();
   await prisma.job.deleteMany();
+  await prisma.jobSeekerProfile.deleteMany();
+  await prisma.recruiterProfile.deleteMany();
   await prisma.user.deleteMany();
   
   // --- Admin User ---
