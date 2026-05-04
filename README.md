@@ -74,3 +74,26 @@ Response
 {
   "accessToken": "JWT_TOKEN"
 }
+
+
+How to generate ACCESS_TOKEN_SECRET and REFRESH_TOKEN_SECRET
+
+  ```bash
+  node -e "const crypto = require('crypto'); console.log(crypto.randomBytes(32).toString('base64').substring(0, 32));"
+
+### pgAdmin4 (already configured in docker-compose.yml)
+
+- Access at: `http://localhost:5050`
+- Login: `admin@example.com` / `admin`
+
+From PowerShell
+ ```bash
+docker exec -it job-finder-db psql -U job_finder_user -d job_finder -W
+
+From connected terminal (does not work)
+ ```bash
+psql -h localhost -p 5433 -U job_finder_user -d job_finder -W
+# Press Enter, then type: secure_password_123
+
+
+netstat -ano | findstr :5432

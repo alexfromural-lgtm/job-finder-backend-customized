@@ -15,16 +15,21 @@ services:
       NODE_ENV: development
       ACCESS_TOKEN_SECRET: ${ACCESS_TOKEN_SECRET}
       REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET}
+    networks:
+      - job-network
+
     volumes:
       - .:/app
-    command: ./scripts/docker-entrypoint.sh
-  
+
   postgres:
     image: postgres:15
     container_name: job-finder-db
     restart: always
     ports:
-      - '5433:5432'
+      - "5432:5432"  # This lets your computer also talk to the DB
+    networks:
+      - job-network
+
     env_file:
       - .env
     environment:
@@ -44,6 +49,12 @@ services:
     depends_on:
       - postgres
     restart: unless-stopped
+    networks:
+      - job-network
+
+networks:
+  job-network:
+    driver: bridge
 
 volumes:
   pgdata:
