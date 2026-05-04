@@ -43,6 +43,7 @@ A simple authentication backend built with **Express.js**, **PostgreSQL**, and *
 
 ```bash
 docker-compose up --build
+```
 
 ## 🧪 API Endpoints
 
@@ -62,43 +63,54 @@ Base URL: `http://localhost:5002/api/auth`
 
 **POST** `/api/auth/signup`
 
+**Request Body:**
 ```json
-Request Body:
 {
   "name": "John Doe",
   "email": "john@example.com",
   "password": "yourpassword"
 }
+```
 
-Response
+**Response:**
+```json
 {
   "accessToken": "JWT_TOKEN"
 }
+```
 
+### Generate ACCESS_TOKEN_SECRET and REFRESH_TOKEN_SECRET
 
-How to generate ACCESS_TOKEN_SECRET and REFRESH_TOKEN_SECRET
-
-  ```bash
-  node -e "const crypto = require('crypto'); console.log(crypto.randomBytes(32).toString('base64').substring(0, 32));"
+```bash
+node -e "const crypto = require('crypto'); console.log(crypto.randomBytes(32).toString('base64').substring(0, 32));"
+```
 
 ### pgAdmin4 (already configured in docker-compose.yml)
 
 - Access at: `http://localhost:5050`
 - Login: `admin@example.com` / `admin`
 
-From PowerShell
- ```bash
-docker exec -it job-finder-db psql -U job_finder_user -d job_finder -W
+### Run psql on the docker container
 
-From connected to PostgreSQL running docker terminal
- ```bash
+**From PowerShell:**
+```bash
+docker exec -it job-finder-db psql -U job_finder_user -d job_finder -W
+```
+
+**From inside the PostgreSQL Docker container:**
+```bash
 psql -U job_finder_user -d job_finder
 # Press Enter, then type: secure_password_123
+```
 
-How to see if somobidy using the same port
+### Troubleshooting: Check if port 5432 is in use
+
 ```bash
 netstat -ano | findstr :5432
+```
 
-// Seed DB inside Docker
+### Seed DB inside Docker
+
 ```bash
 docker exec job-finder-backend npx prisma db seed
+```
