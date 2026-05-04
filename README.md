@@ -1,116 +1,261 @@
-# 🔐 Job Finder Backend API
+# ⚡ Job Finder — Backend API
 
-A simple authentication backend built with **Express.js**, **PostgreSQL**, and **Prisma ORM**. This service provides signup, login, and user authentication APIs with secure access tokens and refresh tokens via cookies.
-
----
-
-## 🚀 Features
-
-- User signup & login with JWT authentication
-- Access & refresh token management via HTTP-only cookies
-- Protected routes using middleware
-- PostgreSQL database with Prisma ORM
-- Environment-based configuration
-- CORS support for frontend communication
+A role-based job board REST API built with **Express.js**, **PostgreSQL**, and **Prisma ORM**. Supports Job Seeker and Recruiter roles with JWT access tokens + HTTP-only refresh token cookies.
 
 ---
 
 ## 🛠 Tech Stack
 
-- **Backend:** Node.js, Express.js
-- **Auth:** JWT, Cookies
-- **Database:** PostgreSQL
-- **ORM:** Prisma
-- **Language:** TypeScript
-- **Other:** dotenv, cookie-parser, cors
+| Technology | Purpose |
+|------------|---------|
+| Node.js + Express.js | HTTP server & routing |
+| TypeScript | Type safety |
+| Prisma ORM | Database access layer |
+| PostgreSQL | Relational database |
+| JWT | Access & refresh token auth |
+| bcrypt | Password hashing |
+| Zod | Request validation |
+| Docker / Docker Compose | Containerised dev environment |
 
 ---
 
-## 🔨 Setup & Running Locally
+## 🏗 Project Structure
+
+```
+src/
+├── controllers/     # Route handlers (auth, job, jobseeker, recruiter)
+├── services/        # Business logic layer
+├── routes/          # Express router definitions
+├── middleware/       # requireAuth, authorizeRoles, validate
+├── validators/      # Zod schemas
+├── prisma/          # Prisma client singleton
+└── utils/           # token.ts, hash.ts
+prisma/
+├── schema.prisma    # Database schema & enums
+└── seed.ts          # Dev seed data
+```
+
+---
+
+## 🔐 Roles & Permissions
+
+| Role | Description |
+|------|-------------|
+| `JOB_SEEKER` | Browse jobs, apply, save jobs, manage profile |
+| `RECRUITER` | Post/edit/delete jobs, view applicants, manage company profile |
+| `ADMIN` | Seed-only; no admin routes exposed yet |
+
+---
+
+## 🚀 Setup & Running Locally
+
 ### Prerequisites
-- Node.js (v16+ recommended)
-- PostgreSQL (if not using Docker)
-- npm or yarn
+- Docker & Docker Compose (recommended)
+- Node.js v18+ (only needed if running without Docker)
 
-- Copy `.env.sample` to `.env` to create your local environment configuration:
+### 1. Configure environment
 
-  ```bash
-  cp .env.sample .env
+```bash
+cp .env.sample .env
+# Then edit .env with your actual values
+```
 
-- update `.env` with your actual values
+**Key `.env` variables:**
 
-## Run
+```env
+DATABASE_URL=postgresql://job_finder_user:secure_password_123@db:5432/job_finder
+ACCESS_TOKEN_SECRET=<32-char random string>
+REFRESH_TOKEN_SECRET=<32-char random string>
+PORT=5002
+NODE_ENV=development
+```
+
+**Generate secrets:**
+
+```bash
+node -e "const c=require('crypto');console.log(c.randomBytes(32).toString('base64').substring(0,32));"
+```
+
+### 2. Start with Docker
 
 ```bash
 docker-compose up --build
 ```
 
-## 🧪 API Endpoints
+This starts:
+- `job-finder-backend` on **port 5002**
+- `job-finder-db` (PostgreSQL) on **port 5432**
+- `pgAdmin4` on **port 5050**
 
-Base URL: `http://localhost:5002/api/auth`
+### 3. Seed the database
 
-| Method | Endpoint  | Description        |
-|--------|-----------|--------------------|
-| POST   | `/signup` | Register a new user |
-| POST   | `/login`  | Authenticate user & return access token |
-| GET    | `/me`     | Get current user info (requires auth) |
+```bash
+docker exec job-finder-backend npx prisma db seed
+```
+
+This creates demo users:
+| Email | Password | Role |
+|-------|----------|------|
+| `admin@example1.com` | `admin` | ADMIN |
+| `recruiter@example.com` | `recruiter123` | RECRUITER |
+| `seeker@example.com` | `seeker123` | JOB_SEEKER |
 
 ---
 
-## 📄 Request/Response Example
+## 🧪 API Reference
 
-### 🔐 Signup
+Base URL: `http://localhost:5002/api`
 
-**POST** `/api/auth/signup`
+---
 
-**Request Body:**
+### Auth — `/api/auth`
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `POST` | `/signup/jobseeker` | — | Register as Job Seeker |
+| `POST` | `/signup/recruiter` | — | Register as Recruiter (includes company fields) |
+| `POST` | `/login` | — | Login; returns `accessToken` + sets `refreshToken` cookie |
+| `POST` | `/logout` | — | Clears `refreshToken` cookie |
+| `POST` | `/refresh` | Cookie | Issue new access + refresh tokens |
+| `GET`  | `/me` | Bearer | Get current authenticated user |
+| `POST` | `/upgrade/recruiter` | Bearer (JOB_SEEKER) | Upgrade Job Seeker account to Recruiter |
+
+**Signup — Job Seeker** `POST /api/auth/signup/jobseeker`
+```json
+{ "name": "John Doe", "email": "john@example.com", "password": "secret123" }
+```
+
+**Signup — Recruiter** `POST /api/auth/signup/recruiter`
 ```json
 {
-  "name": "John Doe",
-  "email": "john@example.com",
-  "password": "yourpassword"
+  "name": "Jane Smith",
+  "email": "jane@corp.com",
+  "password": "secret123",
+  "companyName": "Acme Corp",
+  "companyWebsite": "https://acme.com",
+  "industry": "Technology",
+  "description": "We build cool stuff."
 }
 ```
 
-**Response:**
+**Login** `POST /api/auth/login`
+```json
+{ "email": "john@example.com", "password": "secret123" }
+```
+Response: `{ "accessToken": "<JWT>" }` + `Set-Cookie: refreshToken=<JWT>; HttpOnly`
+
+**Get Me** `GET /api/auth/me` _(requires `Authorization: Bearer <accessToken>`)_
 ```json
 {
-  "accessToken": "JWT_TOKEN"
+  "user": {
+    "id": "uuid",
+    "name": "John Doe",
+    "email": "john@example.com",
+    "roles": ["JOB_SEEKER"],
+    "isActive": true,
+    "createdAt": "2026-01-01T00:00:00.000Z",
+    "updatedAt": "2026-01-01T00:00:00.000Z"
+  }
 }
 ```
 
-### Generate ACCESS_TOKEN_SECRET and REFRESH_TOKEN_SECRET
+---
+
+### Jobs — `/api/jobs`
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `GET` | `/all` | — | List all active jobs (supports `?search=`, `?category=`, `?location=`) |
+| `GET` | `/:id` | — | Get a single job by ID |
+| `GET` | `/recruiter` | Bearer (RECRUITER) | Get jobs posted by the authenticated recruiter |
+| `POST` | `/` | Bearer (RECRUITER) | Create a new job posting |
+| `PUT` | `/:id` | Bearer (RECRUITER) | Update a job (owner only) |
+| `DELETE` | `/:id` | Bearer (RECRUITER) | Delete a job (owner only) |
+
+**Create / Update Job body:**
+```json
+{
+  "title": "Senior React Developer",
+  "description": "We are looking for...",
+  "requirements": "5+ years React experience",
+  "location": "Remote",
+  "salaryRange": "$120,000 – $160,000",
+  "category": "Engineering"
+}
+```
+
+---
+
+### Job Seeker — `/api/jobseeker`
+
+All endpoints require `Authorization: Bearer <accessToken>` with role `JOB_SEEKER`.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/profile` | Get own Job Seeker profile |
+| `PATCH` | `/profile` | Update profile (bio, location, skills, education, experience, resumeUrl) |
+| `POST` | `/apply/:jobId` | Apply to a job (optional `coverLetter` in body) |
+| `GET` | `/applications` | List own applications |
+| `DELETE` | `/applications/:id` | Withdraw an application |
+| `POST` | `/saved/:jobId` | Save a job |
+| `GET` | `/saved` | List saved jobs |
+| `DELETE` | `/saved/:jobId` | Remove a saved job |
+
+---
+
+### Recruiter — `/api/recruiter`
+
+All endpoints require `Authorization: Bearer <accessToken>` with role `RECRUITER`.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/profile` | Get own Recruiter/company profile |
+| `PATCH` | `/profile` | Update company profile (companyName, companyWebsite, description, industry) |
+| `GET` | `/jobs/:jobId/applications` | List applicants for a specific job |
+| `PATCH` | `/applications/:id/status` | Update application status |
+
+**Application statuses:** `submitted` · `shortlisted` · `under_review` · `rejected`
+
+---
+
+## 🗄 Database
+
+### Useful psql commands
 
 ```bash
-node -e "const crypto = require('crypto'); console.log(crypto.randomBytes(32).toString('base64').substring(0, 32));"
+# Connect from PowerShell
+docker exec -it job-finder-db psql -U job_finder_user -d job_finder -W
+# Password: secure_password_123
+
+# Inside the container
+psql -U job_finder_user -d job_finder
 ```
 
-### pgAdmin4 (already configured in docker-compose.yml)
+### pgAdmin4
 
-- Access at: `http://localhost:5050`
+- URL: `http://localhost:5050`
 - Login: `admin@example.com` / `admin`
 
-### Run psql on the docker container
-
-**From PowerShell:**
-```bash
-docker exec -it job-finder-db psql -U job_finder_user -d job_finder -W
-```
-
-**From inside the PostgreSQL Docker container:**
-```bash
-psql -U job_finder_user -d job_finder
-# Press Enter, then type: secure_password_123
-```
-
-### Troubleshooting: Check if port 5432 is in use
+### Check if port 5432 is in use (Windows)
 
 ```bash
 netstat -ano | findstr :5432
 ```
 
-### Seed DB inside Docker
+---
+
+## 🌱 Seeding
 
 ```bash
+# Inside Docker
 docker exec job-finder-backend npx prisma db seed
+
+# Locally (without Docker)
+npx prisma db seed
 ```
+
+---
+
+## 🔗 Frontend
+
+The React frontend lives at [`../job-finder-react-customized`](../job-finder-react-customized) and proxies all `/api` calls to this service on port **5002**.
