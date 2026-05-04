@@ -90,10 +90,10 @@ From PowerShell
  ```bash
 docker exec -it job-finder-db psql -U job_finder_user -d job_finder -W
 
-From connected terminal (does not work)
+From connected to PostgreSQL running docker terminal
  ```bash
-psql -h localhost -p 5433 -U job_finder_user -d job_finder -W
+psql -U job_finder_user -d job_finder
 # Press Enter, then type: secure_password_123
 
-
+How to see if somobidy using the same port
 netstat -ano | findstr :5432

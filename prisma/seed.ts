@@ -1,19 +1,27 @@
 import { PrismaClient } from '@prisma/client';
-import { Role } from '@prisma/client';
+
 const prisma = new PrismaClient();
 
 async function main() {
   console.log("🌱 Starting seed...");
 
+  // Clean up existing data for a fresh seed
+  await prisma.savedJob.deleteMany();
+  await prisma.application.deleteMany();
+  await prisma.job.deleteMany();
+  await prisma.user.deleteMany();
+  
   // --- Admin User ---
   const admin = await prisma.user.create({
     data: {
       name: "Admin User",
       email: "admin@example1.com",
-      password: "admin", // hash it in production
-      role: Role.ADMIN
+      password: "admin",
+      roles: ["ADMIN"]
     }
   });
+
+  console.log("✅ Created admin user:", admin.email);
 
   // --- Recruiter + Profile + Job ---
   const recruiterUser = await prisma.user.create({
@@ -21,7 +29,7 @@ async function main() {
       name: "Recruiter Jane",
       email: "recruiter@example.com",
       password: "hashed_recruiter_password",
-      role: Role.RECRUITER,
+      roles: ["RECRUITER"],
       recruiter: {
         create: {
           companyName: "Tech Corp",
@@ -36,6 +44,8 @@ async function main() {
     }
   });
 
+  console.log("✅ Created recruiter:", recruiterUser.email, "Company:", recruiterUser.recruiter?.companyName);
+
   const job = await prisma.job.create({
     data: {
       recruiterId: recruiterUser.recruiter!.id,
@@ -48,13 +58,15 @@ async function main() {
     }
   });
 
+  console.log("✅ Created job:", job.title);
+
   // --- Job Seeker + Profile + Application + SavedJob ---
   const seekerUser = await prisma.user.create({
     data: {
       name: "Job Seeker John",
       email: "seeker@example.com",
       password: "hashed_seeker_password",
-      role: Role.JOB_SEEKER,
+      roles: ["JOB_SEEKER"],
       jobSeeker: {
         create: {
           bio: "Passionate about frontend development",
@@ -71,6 +83,8 @@ async function main() {
     }
   });
 
+  console.log("✅ Created job seeker:", seekerUser.email);
+
   await prisma.application.create({
     data: {
       jobId: job.id,
@@ -79,12 +93,16 @@ async function main() {
     }
   });
 
+  console.log("✅ Created application");
+
   await prisma.savedJob.create({
     data: {
       jobId: job.id,
       jobSeekerId: seekerUser.jobSeeker!.id
     }
   });
+
+  console.log("✅ Created saved job");
 
   console.log("✅ Seeding complete!");
 }
