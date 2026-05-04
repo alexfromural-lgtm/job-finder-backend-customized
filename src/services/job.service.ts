@@ -16,7 +16,7 @@ export const getJobById = async (jobId: string) => {
     where: { id: jobId },
     include: {
       recruiter: {
-        select: { companyName: true, industry: true },
+        select: { companyName: true, industry: true, companyWebsite: true },
       },
     },
   });

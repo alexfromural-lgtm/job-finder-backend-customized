@@ -149,6 +149,7 @@ export const getCurrentUser = async (userId: string) => {
       roles: true,
       isActive: true,
       createdAt: true,
+      updatedAt: true,
     },
   });
 
