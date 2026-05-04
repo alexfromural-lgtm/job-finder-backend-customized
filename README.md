@@ -87,9 +87,18 @@ This starts:
 - `job-finder-db` (PostgreSQL) on **port 5432**
 - `pgAdmin4` on **port 5050**
 
-### 3. Seed the database
+### 3. Initialize the database
+
+Run these three commands in order on a fresh setup:
 
 ```bash
+# Generate the Prisma client
+docker exec job-finder-backend npx prisma generate
+
+# Apply migrations (creates all tables)
+docker exec job-finder-backend npx prisma migrate deploy
+
+# Seed the database with demo data
 docker exec job-finder-backend npx prisma db seed
 ```
 
