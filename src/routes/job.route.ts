@@ -8,7 +8,6 @@ const router = Router();
 
 // Public
 router.get("/all", JobController.getAllJobs);
-router.get("/:id", JobController.getJobById);
 
 // Recruiter only
 router.post(
@@ -25,6 +24,9 @@ router.get(
   authorizeRoles("RECRUITER"),
   JobController.getJobsByRecruiter
 );
+
+// Must be AFTER specific routes to prevent wildcard from catching /recruiter
+router.get("/:id", JobController.getJobById);
 
 router.put(
   "/:id",
