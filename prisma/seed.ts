@@ -54,11 +54,11 @@ async function main() {
   const job = await prisma.job.create({
     data: {
       recruiterId: recruiterUser.recruiter!.id,
-      title: "Frontend Developer",
+      title: "Senior FullStack Developer",
       description: "React developer needed",
-      requirements: "2+ years of experience in React",
+      requirements: "8+ years of experience in React and Node.js",
       location: "Remote",
-      salaryRange: "$80,000 - $100,000",
+      salaryRange: "$130,000 - $180,000",
       category: "Software"
     }
   });
