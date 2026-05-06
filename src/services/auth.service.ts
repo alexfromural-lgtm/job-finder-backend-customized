@@ -8,18 +8,31 @@ import {
 } from "../utils/token";
 import { RecruiterSignupInput } from "../validators/recruiter.schema";
 
+// Helper: Validate email and password are provided
+const validateCredentials = (email?: string | null, password?: string | null) => {
+  if (!email || !password) throw new Error("Email and password are required");
+};
+
+// Helper: Check if user already exists by email
+const checkUserExistsByEmail = async (email: string) => {
+  const existingUser = await prisma.user.findUnique({ where: { email } });
+  if (existingUser) throw new Error("User already exists");
+};
+
+// Helper: Generate JWT tokens for a user
+const generateTokensForUser = async (userId: string, roles: Role[]) => {
+  const accessToken = generateAccessToken(userId, roles);
+  const refreshToken = generateRefreshToken(userId, roles);
+  return { accessToken, refreshToken };
+};
+
 export const signupJobSeeker = async (
   name: string,
   email: string,
   password: string
 ) => {
-  if (!email || !password) throw new Error("Email and password are required");
-
-  const existingUser = await prisma.user.findUnique({
-    where: { email },
-  });
-
-  if (existingUser) throw new Error("User already exists");
+  validateCredentials(email, password);
+  await checkUserExistsByEmail(email);
 
   const hashed = await hashPassword(password);
   const user = await prisma.user.create({
@@ -32,54 +45,35 @@ export const signupJobSeeker = async (
     },
   });
 
-  const accessToken = generateAccessToken(user.id, user.roles);
-  const refreshToken = generateRefreshToken(user.id, user.roles);
-
-  return { accessToken, refreshToken };
+  return generateTokensForUser(user.id, user.roles);
 };
 
 export const signupRecruitor = async (data: RecruiterSignupInput) => {
-  const {
-    name,
-    email,
-    password,
-    companyName,
-    companyWebsite,
-    description,
-    industry,
-  } = data;
+  const { name, email, password, companyName, companyWebsite, description, industry } = data;
 
-  if (!email || !password) throw new Error("Email and password are required");
-
-  const existingUser = await prisma.user.findUnique({
-    where: { email },
-  });
-
-  if (existingUser) throw new Error("User already exists");
+  validateCredentials(email, password);
+  await checkUserExistsByEmail(email);
 
   const hashed = await hashPassword(password);
   const user = await prisma.user.create({
     data: {
-      name: name,
-      email: email,
+      name,
+      email,
       password: hashed,
       roles: [Role.RECRUITER],
       recruiter: {
         create: {
-          companyName: companyName,
-          companyWebsite: companyWebsite,
-          description: description,
-          industry: industry,
+          companyName,
+          companyWebsite,
+          description,
+          industry,
         },
       },
     },
     include: { recruiter: true },
   });
 
-  const accessToken = generateAccessToken(user.id, user.roles);
-  const refreshToken = generateRefreshToken(user.id, user.roles);
-
-  return { accessToken, refreshToken };
+  return generateTokensForUser(user.id, user.roles);
 };
 
 export const upgradeToRecruiter = async (userId: string, data: RecruiterSignupInput) => {
@@ -111,19 +105,15 @@ export const upgradeToRecruiter = async (userId: string, data: RecruiterSignupIn
 };
 
 export const login = async (email: string, password: string) => {
-  if (!email || !password) throw new Error("Email and Password required");
+  validateCredentials(email, password);
 
   const user = await prisma.user.findUnique({ where: { email } });
-
   if (!user) throw new Error("Invalid email or password");
 
   const valid = await comparePasswords(password, user.password);
-  if (!valid) throw new Error("Invalid email or password");
+  if (!valid) throw new Error("Invalid credentials");
 
-  const accessToken = generateAccessToken(user.id, user.roles);
-  const refreshToken = generateRefreshToken(user.id, user.roles);
-
-  return { accessToken, refreshToken };
+  return generateTokensForUser(user.id, user.roles);
 };
 
 export const refreshTokens = async (refreshToken: string) => {
@@ -133,10 +123,7 @@ export const refreshTokens = async (refreshToken: string) => {
   if (!user) throw new Error("User not found");
   if (!user.isActive) throw new Error("Account is deactivated");
 
-  const newAccessToken = generateAccessToken(user.id, user.roles);
-  const newRefreshToken = generateRefreshToken(user.id, user.roles);
-
-  return { accessToken: newAccessToken, refreshToken: newRefreshToken };
+  return generateTokensForUser(user.id, user.roles);
 };
 
 export const getCurrentUser = async (userId: string) => {
