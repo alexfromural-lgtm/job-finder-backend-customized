@@ -93,6 +93,12 @@ model Job {
   applications Application[]
   savedBy      SavedJob[]
   reports      Report[]
+
+  // Performance indexes for job search & listing queries
+  @@index([isActive])
+  @@index([isActive, category])
+  @@index([recruiterId, createdAt(sort: Desc)])
+  @@index([isActive, createdAt(sort: Desc)])
 }
 
 model Application {

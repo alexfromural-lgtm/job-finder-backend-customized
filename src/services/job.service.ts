@@ -66,28 +66,39 @@ export const getAllJobs = async (filters?: {
   category?: string;
   location?: string;
   search?: string;
+  page?: number;
+  pageSize?: number;
 }) => {
-  const jobs = await prisma.job.findMany({
-    where: {
-      isActive: true,
-      ...(filters?.category && { category: filters.category }),
-      ...(filters?.location && {
-        location: { contains: filters.location, mode: "insensitive" },
-      }),
-      ...(filters?.search && {
-        OR: [
-          { title: { contains: filters.search, mode: "insensitive" } },
-          { description: { contains: filters.search, mode: "insensitive" } },
-        ],
-      }),
-    },
-    include: {
-      recruiter: {
-        select: { companyName: true, industry: true },
-      },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const page = Math.max(1, filters?.page ?? 1);
+  const pageSize = Math.min(100, Math.max(1, filters?.pageSize ?? 10));
+  const skip = (page - 1) * pageSize;
 
-  return jobs;
+  const where = {
+    isActive: true,
+    ...(filters?.category && { category: filters.category }),
+    ...(filters?.location && {
+      location: { contains: filters.location, mode: "insensitive" as const },
+    }),
+    ...(filters?.search && {
+      OR: [
+        { title: { contains: filters.search, mode: "insensitive" as const } },
+        { description: { contains: filters.search, mode: "insensitive" as const } },
+      ],
+    }),
+  };
+
+  const [jobs, total] = await prisma.$transaction([
+    prisma.job.findMany({
+      where,
+      include: {
+        recruiter: { select: { companyName: true, industry: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: pageSize,
+    }),
+    prisma.job.count({ where }),
+  ]);
+
+  return { jobs, total, page, pageSize, totalPages: Math.ceil(total / pageSize) };
 };

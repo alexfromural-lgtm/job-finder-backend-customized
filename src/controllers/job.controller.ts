@@ -95,14 +95,25 @@ export const deleteJob = async (req: AuthRequest, res: Response) => {
 
 export const getAllJobs = async (req: AuthRequest, res: Response) => {
   try {
-    const { category, location, search } = req.query as {
-      category?: string;
-      location?: string;
-      search?: string;
-    };
+    const { category, location, search, page, pageSize } = req.query as Record<string, string | undefined>;
 
-    const jobs = await JobService.getAllJobs({ category, location, search });
-    res.status(200).json({ data: jobs });
+    const result = await JobService.getAllJobs({
+      category,
+      location,
+      search,
+      page: page ? parseInt(page, 10) : undefined,
+      pageSize: pageSize ? parseInt(pageSize, 10) : undefined,
+    });
+
+    res.status(200).json({
+      data: result.jobs,
+      meta: {
+        total: result.total,
+        page: result.page,
+        pageSize: result.pageSize,
+        totalPages: result.totalPages,
+      },
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
