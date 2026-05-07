@@ -1,40 +1,32 @@
 import { Response } from "express";
 import { AuthRequest } from "../middleware/auth.middleware";
 import * as JobService from "../services/job.service";
-import * as RecruiterService from "../services/recruiter.service";
+import * as jobUtils from "../utils/job.utils";
+import { handleAuthAwareError } from "../utils/auth.utils";
+import { handleGenericError } from "../utils/job.utils";
 
 export const getJobsByRecruiter = async (req: AuthRequest, res: Response) => {
   try {
-    const userId = req.userId!;
-
-    const recruiter = await RecruiterService.getRecruiterProfile(userId);
-    if (!recruiter) {
-      res.status(404).json({ error: "Recruiter profile not found. Please create one first." });
-      return;
-    }
+    const recruiter = await jobUtils.validateRecruiterProfile(req.userId!, res);
+    if (!recruiter) return;
 
     const jobs = await JobService.getJobsByRecruiter(recruiter.id);
     res.status(200).json({ data: jobs });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    handleGenericError(err, res);
   }
 };
 
 export const createJob = async (req: AuthRequest, res: Response) => {
   try {
-    const userId = req.userId!;
+    const recruiter = await jobUtils.validateRecruiterProfile(req.userId!, res);
+    if (!recruiter) return;
+
     const jobData = req.body;
-
-    const recruiter = await RecruiterService.getRecruiterProfile(userId);
-    if (!recruiter) {
-      res.status(404).json({ error: "Recruiter profile not found. Please create one first." });
-      return;
-    }
-
     const job = await JobService.createJob(recruiter.id, jobData);
     res.status(201).json({ message: "Job created successfully!", data: job });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    handleGenericError(err, res);
   }
 };
 
@@ -50,46 +42,34 @@ export const getJobById = async (req: AuthRequest, res: Response) => {
 
     res.status(200).json({ data: job });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    handleGenericError(err, res);
   }
 };
 
 export const updateJob = async (req: AuthRequest, res: Response) => {
   try {
-    const userId = req.userId!;
+    const recruiter = await jobUtils.validateRecruiterProfile(req.userId!, res);
+    if (!recruiter) return;
+
     const jobId = req.params.id;
     const jobData = req.body;
-
-    const recruiter = await RecruiterService.getRecruiterProfile(userId);
-    if (!recruiter) {
-      res.status(404).json({ error: "Recruiter profile not found" });
-      return;
-    }
-
     const job = await JobService.updateJob(jobId, recruiter.id, jobData);
     res.status(200).json({ message: "Job updated successfully!", data: job });
   } catch (err: any) {
-    const status = err.message.includes("not authorized") ? 403 : 400;
-    res.status(status).json({ error: err.message });
+    handleAuthAwareError(err, res);
   }
 };
 
 export const deleteJob = async (req: AuthRequest, res: Response) => {
   try {
-    const userId = req.userId!;
+    const recruiter = await jobUtils.validateRecruiterProfile(req.userId!, res);
+    if (!recruiter) return;
+
     const jobId = req.params.id;
-
-    const recruiter = await RecruiterService.getRecruiterProfile(userId);
-    if (!recruiter) {
-      res.status(404).json({ error: "Recruiter profile not found" });
-      return;
-    }
-
     await JobService.deleteJob(jobId, recruiter.id);
     res.status(200).json({ message: "Job deleted successfully!" });
   } catch (err: any) {
-    const status = err.message.includes("not authorized") ? 403 : 400;
-    res.status(status).json({ error: err.message });
+    handleAuthAwareError(err, res);
   }
 };
 
@@ -115,6 +95,6 @@ export const getAllJobs = async (req: AuthRequest, res: Response) => {
       },
     });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    handleGenericError(err, res);
   }
 };

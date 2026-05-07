@@ -2,6 +2,8 @@ import { Response } from "express";
 import { ApplicationStatus } from "@prisma/client";
 import { AuthRequest } from "../middleware/auth.middleware";
 import * as RecruiterService from "../services/recruiter.service";
+import { handleAuthAwareError } from "../utils/auth.utils";
+import { handleGenericError } from "../utils/job.utils";
 
 export const getProfile = async (req: AuthRequest, res: Response) => {
   try {
@@ -15,7 +17,7 @@ export const getProfile = async (req: AuthRequest, res: Response) => {
 
     res.status(200).json({ data: profile });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    handleGenericError(err, res);
   }
 };
 
@@ -25,7 +27,7 @@ export const updateProfile = async (req: AuthRequest, res: Response) => {
     const profile = await RecruiterService.updateRecruiterProfile(userId, req.body);
     res.status(200).json({ data: profile });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    handleGenericError(err, res);
   }
 };
 
@@ -37,8 +39,7 @@ export const getApplicationsForJob = async (req: AuthRequest, res: Response) => 
     const data = await RecruiterService.getApplicationsForJob(userId, jobId);
     res.status(200).json({ data });
   } catch (err: any) {
-    const status = err.message.includes("not authorized") ? 403 : 404;
-    res.status(status).json({ error: err.message });
+    handleAuthAwareError(err, res);
   }
 };
 
@@ -57,7 +58,6 @@ export const updateApplicationStatus = async (req: AuthRequest, res: Response) =
     const application = await RecruiterService.updateApplicationStatus(userId, applicationId, status);
     res.status(200).json({ application });
   } catch (err: any) {
-    const status = err.message.includes("not authorized") ? 403 : 400;
-    res.status(status).json({ error: err.message });
+    handleAuthAwareError(err, res);
   }
 };

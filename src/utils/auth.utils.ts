@@ -14,6 +14,23 @@ export const validateCredentials = (email?: string | null, password?: string | n
 };
 
 /**
+ * Handles authorization errors with appropriate HTTP status codes.
+ * By default returns 403 for "not authorized" errors, 400 for other validation errors.
+ * Pass `options.keyword` + `options.keywordStatus` to map an additional keyword to a custom status.
+ */
+export const handleAuthAwareError = (
+  err: any,
+  res: Response,
+  options?: { keyword: string; keywordStatus: number }
+) => {
+  let status = err.message.includes("not authorized") ? 403 : 400;
+  if (options && err.message.includes(options.keyword)) {
+    status = options.keywordStatus;
+  }
+  res.status(status).json({ error: err.message });
+};
+
+/**
  * Checks if a user already exists by email.
  */
 export const checkUserExistsByEmail = async (email: string) => {

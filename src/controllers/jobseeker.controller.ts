@@ -1,6 +1,8 @@
 import { Response } from "express";
 import { AuthRequest } from "../middleware/auth.middleware";
 import * as JobseekerService from "../services/jobseeker.service";
+import { handleAuthAwareError } from "../utils/auth.utils";
+import { handleGenericError } from "../utils/job.utils";
 
 export const getProfile = async (req: AuthRequest, res: Response) => {
   try {
@@ -14,7 +16,7 @@ export const getProfile = async (req: AuthRequest, res: Response) => {
 
     res.status(200).json({ profile });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    handleGenericError(err, res);
   }
 };
 
@@ -24,7 +26,7 @@ export const updateProfile = async (req: AuthRequest, res: Response) => {
     const profile = await JobseekerService.updateJobSeekerProfile(userId, req.body);
     res.status(200).json({ profile });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    handleGenericError(err, res);
   }
 };
 
@@ -37,8 +39,7 @@ export const applyToJob = async (req: AuthRequest, res: Response) => {
     const application = await JobseekerService.applyToJob(userId, jobId, coverLetter);
     res.status(201).json({ application });
   } catch (err: any) {
-    const status = err.message.includes("already applied") ? 409 : 400;
-    res.status(status).json({ error: err.message });
+    handleAuthAwareError(err, res, { keyword: "already applied", keywordStatus: 409 });
   }
 };
 
@@ -48,7 +49,7 @@ export const getApplications = async (req: AuthRequest, res: Response) => {
     const data = await JobseekerService.getApplications(userId);
     res.status(200).json({ data });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    handleGenericError(err, res);
   }
 };
 
@@ -60,8 +61,7 @@ export const withdrawApplication = async (req: AuthRequest, res: Response) => {
     await JobseekerService.withdrawApplication(userId, applicationId);
     res.status(200).json({ message: "Application withdrawn successfully" });
   } catch (err: any) {
-    const status = err.message.includes("not authorized") ? 403 : 404;
-    res.status(status).json({ error: err.message });
+    handleAuthAwareError(err, res);
   }
 };
 
@@ -73,7 +73,7 @@ export const saveJob = async (req: AuthRequest, res: Response) => {
     const savedJob = await JobseekerService.saveJob(userId, jobId);
     res.status(201).json({ savedJob });
   } catch (err: any) {
-    res.status(400).json({ error: err.message });
+    handleAuthAwareError(err, res);
   }
 };
 
@@ -83,7 +83,7 @@ export const getSavedJobs = async (req: AuthRequest, res: Response) => {
     const data = await JobseekerService.getSavedJobs(userId);
     res.status(200).json({ data });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    handleGenericError(err, res);
   }
 };
 
@@ -95,7 +95,6 @@ export const unsaveJob = async (req: AuthRequest, res: Response) => {
     await JobseekerService.unsaveJob(userId, jobId);
     res.status(200).json({ message: "Job removed from saved list" });
   } catch (err: any) {
-    const status = err.message.includes("not found") ? 404 : 400;
-    res.status(status).json({ error: err.message });
+    handleAuthAwareError(err, res, { keyword: "not found", keywordStatus: 404 });
   }
 };
