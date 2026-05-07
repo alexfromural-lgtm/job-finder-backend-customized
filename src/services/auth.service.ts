@@ -1,30 +1,9 @@
 import { Role } from "@prisma/client";
 import prisma from "../prisma/client";
 import { comparePasswords, hashPassword } from "../utils/hash";
-import {
-  generateAccessToken,
-  generateRefreshToken,
-  verifyRefreshToken,
-} from "../utils/token";
+import { validateCredentials, checkUserExistsByEmail, generateTokensForUser } from "../utils/auth.utils";
+import { verifyRefreshToken } from "../utils/token";
 import { RecruiterSignupInput } from "../validators/recruiter.schema";
-
-// Helper: Validate email and password are provided
-const validateCredentials = (email?: string | null, password?: string | null) => {
-  if (!email || !password) throw new Error("Email and password are required");
-};
-
-// Helper: Check if user already exists by email
-const checkUserExistsByEmail = async (email: string) => {
-  const existingUser = await prisma.user.findUnique({ where: { email } });
-  if (existingUser) throw new Error("User already exists");
-};
-
-// Helper: Generate JWT tokens for a user
-const generateTokensForUser = async (userId: string, roles: Role[]) => {
-  const accessToken = generateAccessToken(userId, roles);
-  const refreshToken = generateRefreshToken(userId, roles);
-  return { accessToken, refreshToken };
-};
 
 export const signupJobSeeker = async (
   name: string,
