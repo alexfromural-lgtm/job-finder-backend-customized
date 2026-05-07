@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import * as AuthService from "../services/auth.service";
 import { AuthRequest } from "../middleware/auth.middleware";
+import { setRefreshTokenCookie } from "../utils/auth.utils";
 
 export const signupJobSeeker = async (req: Request, res: Response) => {
   try {
@@ -11,13 +12,7 @@ export const signupJobSeeker = async (req: Request, res: Response) => {
       password
     );
 
-    res.cookie("refreshToken", refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
-
+    setRefreshTokenCookie(res, refreshToken);
     res.status(201).json({ accessToken });
   } catch (error: Error | any) {
     res.status(400).json({ error: error.message });
@@ -34,13 +29,7 @@ export const signupRecruitor = async (req: Request, res: Response) => {
       ...req.body,
     });
 
-    res.cookie("refreshToken", refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
-
+    setRefreshTokenCookie(res, refreshToken);
     res.status(201).json({ accessToken });
   } catch (error: Error | any) {
     res.status(400).json({ error: error.message });
@@ -66,13 +55,7 @@ export const login = async (req: Request, res: Response) => {
       password
     );
 
-    res.cookie("refreshToken", refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
-
+    setRefreshTokenCookie(res, refreshToken);
     res.status(200).json({ accessToken });
   } catch (error: Error | any) {
     res.status(400).json({ error: error.message });
@@ -90,13 +73,7 @@ export const refreshTokens = async (req: Request, res: Response) => {
 
     const { accessToken, refreshToken } = await AuthService.refreshTokens(token);
 
-    res.cookie("refreshToken", refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
-
+    setRefreshTokenCookie(res, refreshToken);
     res.status(200).json({ accessToken });
   } catch (error: Error | any) {
     res.status(401).json({ error: "Invalid or expired refresh token" });
