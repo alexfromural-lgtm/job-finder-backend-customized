@@ -1,6 +1,6 @@
 # ⚡ Job Finder — Backend API
 
-A role-based job board REST API built with **Express.js**, **PostgreSQL**, and **Prisma ORM**. Supports Job Seeker and Recruiter roles with JWT access tokens + HTTP-only refresh token cookies.
+A role-based job board REST API built with **Express.js**, **PostgreSQL**, **Prisma ORM**, and **Redis/Bull** message queuing. Supports Job Seeker and Recruiter roles with JWT access tokens + HTTP-only refresh token cookies. High-traffic write operations (apply to job, save job) are handled asynchronously via a Bull queue.
 
 ---
 
@@ -12,6 +12,8 @@ A role-based job board REST API built with **Express.js**, **PostgreSQL**, and *
 | TypeScript | Type safety |
 | Prisma ORM | Database access layer |
 | PostgreSQL | Relational database |
+| Redis 7 | Message broker for Bull queues |
+| Bull | Job queue for async DB write operations |
 | JWT | Access & refresh token auth |
 | bcrypt | Password hashing |
 | Zod | Request validation |
@@ -25,11 +27,15 @@ A role-based job board REST API built with **Express.js**, **PostgreSQL**, and *
 src/
 ├── controllers/     # Route handlers (auth, job, jobseeker, recruiter)
 ├── services/        # Business logic layer
-├── routes/          # Express router definitions
-├── middleware/       # requireAuth, authorizeRoles, validate
+├── routes/          # Express router definitions (includes queue.route.ts)
+├── middleware/      # requireAuth, authorizeRoles, validate
 ├── validators/      # Zod schemas
 ├── prisma/          # Prisma client singleton
-└── utils/           # token.ts, hash.ts
+├── queue/           # Bull queue infrastructure
+│   ├── queue.ts     # Shared Bull queue instance (db-write-queue)
+│   ├── worker.ts    # Queue processor — dispatches to service layer
+│   └── types.ts     # QueuePayload discriminated union
+└── utils/           # token.ts, hash.ts, auth.utils.ts, job.utils.ts
 prisma/
 ├── schema.prisma    # Database schema & enums
 └── seed.ts          # Dev seed data
@@ -68,6 +74,8 @@ ACCESS_TOKEN_SECRET=<32-char random string>
 REFRESH_TOKEN_SECRET=<32-char random string>
 PORT=5002
 NODE_ENV=development
+REDIS_URL=redis://redis:6379
+QUEUE_CONCURRENCY=5
 ```
 
 **Generate secrets:**
@@ -85,6 +93,7 @@ docker-compose up --build
 This starts:
 - `job-finder-backend` on **port 5002**
 - `job-finder-db` (PostgreSQL) on **port 5432**
+- `job-finder-redis` (Redis 7) on **port 6379**
 - `pgAdmin4` on **port 5050**
 
 ### 3. Initialize the database
@@ -203,12 +212,19 @@ All endpoints require `Authorization: Bearer <accessToken>` with role `JOB_SEEKE
 |--------|----------|-------------|
 | `GET` | `/profile` | Get own Job Seeker profile |
 | `PATCH` | `/profile` | Update profile (bio, location, skills, education, experience, resumeUrl) |
-| `POST` | `/apply/:jobId` | Apply to a job (optional `coverLetter` in body) |
+| `POST` | `/apply/:jobId` | **Enqueue** an application — returns `202 Accepted` + `jobId` |
 | `GET` | `/applications` | List own applications |
 | `DELETE` | `/applications/:id` | Withdraw an application |
-| `POST` | `/saved/:jobId` | Save a job |
+| `POST` | `/saved/:jobId` | **Enqueue** a save-job write — returns `202 Accepted` + `jobId` |
 | `GET` | `/saved` | List saved jobs |
 | `DELETE` | `/saved/:jobId` | Remove a saved job |
+
+> **Async writes:** `POST /apply/:jobId` and `POST /saved/:jobId` no longer block on the DB write. They immediately enqueue the work via Bull and return `202 Accepted` with a `{ jobId, status: "queued" }` body. The client must poll `GET /api/queue/job/:jobId` to track completion.
+
+**Apply response (202):**
+```json
+{ "jobId": "<bull-job-id>", "status": "queued" }
+```
 
 ---
 
@@ -224,6 +240,33 @@ All endpoints require `Authorization: Bearer <accessToken>` with role `RECRUITER
 | `PATCH` | `/applications/:id/status` | Update application status |
 
 **Application statuses:** `submitted` · `shortlisted` · `under_review` · `rejected`
+
+---
+
+### Queue — `/api/queue`
+
+Public polling endpoint — no auth required.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/job/:jobId` | Poll the status of a queued write operation |
+
+**Response:**
+```json
+{
+  "id": "<bull-job-id>",
+  "type": "apply-to-job",
+  "status": "completed",
+  "attemptsMade": 1,
+  "createdAt": "2026-05-11T18:00:00.000Z",
+  "result": { /* Application object on completion */ }
+}
+```
+
+**Possible statuses:** `waiting` · `active` · `completed` · `failed` · `delayed` · `paused`
+
+On `completed`, the `result` field contains the Application (or SavedJob) object.  
+On `failed`, the `failedReason` field contains the error message.
 
 ---
 
@@ -249,6 +292,8 @@ psql -U job_finder_user -d job_finder
 
 ```bash
 netstat -ano | findstr :5432
+
+Get-Process -Id (Get-NetTCPConnection -LocalPort 5432).OwningProcess | Stop-Process -Force
 ```
 
 ---

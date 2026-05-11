@@ -3,6 +3,7 @@ import { AuthRequest } from "../middleware/auth.middleware";
 import * as JobseekerService from "../services/jobseeker.service";
 import { handleAuthAwareError } from "../utils/auth.utils";
 import { handleGenericError } from "../utils/job.utils";
+import dbWriteQueue from "../queue/queue";
 
 export const getProfile = async (req: AuthRequest, res: Response) => {
   try {
@@ -36,10 +37,10 @@ export const applyToJob = async (req: AuthRequest, res: Response) => {
     const jobId = req.params.jobId;
     const { coverLetter } = req.body;
 
-    const application = await JobseekerService.applyToJob(userId, jobId, coverLetter);
-    res.status(201).json({ application });
+    const job = await dbWriteQueue.add({ type: "apply-to-job", userId, jobId, coverLetter });
+    res.status(202).json({ jobId: job.id, status: "queued" });
   } catch (err: any) {
-    handleAuthAwareError(err, res, { keyword: "already applied", keywordStatus: 409 });
+    handleGenericError(err, res);
   }
 };
 
@@ -70,10 +71,10 @@ export const saveJob = async (req: AuthRequest, res: Response) => {
     const userId = req.userId!;
     const jobId = req.params.jobId;
 
-    const savedJob = await JobseekerService.saveJob(userId, jobId);
-    res.status(201).json({ savedJob });
+    const job = await dbWriteQueue.add({ type: "save-job", userId, jobId });
+    res.status(202).json({ jobId: job.id, status: "queued" });
   } catch (err: any) {
-    handleAuthAwareError(err, res);
+    handleGenericError(err, res);
   }
 };
 
