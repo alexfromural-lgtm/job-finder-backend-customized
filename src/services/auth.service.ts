@@ -90,7 +90,7 @@ export const login = async (email: string, password: string) => {
   if (!user) throw new Error("Invalid email or password");
 
   const valid = await comparePasswords(password, user.password);
-  if (!valid) throw new Error("Invalid credentials");
+  if (!valid) throw new Error("Invalid email or password"); // Should be the same error message to make it harder to guess BE logic
 
   return generateTokensForUser(user.id, user.roles);
 };
