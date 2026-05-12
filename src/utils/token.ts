@@ -1,15 +1,15 @@
 import { Role } from '@prisma/client';
-import jwt from 'jsonwebtoken';
+import jwt, { type SignOptions } from 'jsonwebtoken';
 
 export const generateAccessToken = (userId: string, roles: Role[]) => {
 	return jwt.sign({ userId , roles}, process.env.ACCESS_TOKEN_SECRET!, {
-		expiresIn: '15m',
+		expiresIn: process.env.ACCESS_TOKEN_EXPIRES_IN as SignOptions['expiresIn'],
 	});
 };
 
 export const generateRefreshToken = (userId: string, roles: Role[]) => {
 	return jwt.sign({ userId , roles}, process.env.REFRESH_TOKEN_SECRET!, {
-		expiresIn: '7d',
+		expiresIn: process.env.REFRESH_TOKEN_EXPIRES_IN as SignOptions['expiresIn'],
 	});
 };
 
