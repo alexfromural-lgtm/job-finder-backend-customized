@@ -1,4 +1,6 @@
 import express from "express";
+import helmet from "helmet";
+import compression from "compression";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -13,7 +15,15 @@ dotenv.config();
 
 const app = express();
 
-app.use(cors({ origin: "http://localhost:3000", credentials: true }));
+// Security: set secure HTTP headers (should be first)
+app.use(helmet());
+
+// Performance: gzip compression in production
+if (process.env.NODE_ENV === "production") {
+  app.use(compression());
+}
+
+app.use(cors({ origin: process.env.CORS_ORIGIN || "http://localhost:3000", credentials: true }));
 app.use(express.json());
 app.use(cookieParser());
 

@@ -17,6 +17,9 @@ A role-based job board REST API built with **Express.js**, **PostgreSQL**, **Pri
 | JWT | Access & refresh token auth |
 | bcrypt | Password hashing |
 | Zod | Request validation |
+| helmet | Secure HTTP response headers |
+| express-rate-limit | Brute-force & signup spam protection |
+| compression | Gzip response compression (production) |
 | Docker / Docker Compose | Containerised dev environment |
 
 ---
@@ -73,9 +76,10 @@ DATABASE_URL=postgresql://job_finder_user:secure_password_123@db:5432/job_finder
 ACCESS_TOKEN_SECRET=<32-char random string>
 REFRESH_TOKEN_SECRET=<32-char random string>
 PORT=5002
-NODE_ENV=development
+NODE_ENV=development          # set to "production" to enable gzip compression
 REDIS_URL=redis://redis:6379
 QUEUE_CONCURRENCY=5
+CORS_ORIGIN=http://localhost:3000   # update to your frontend domain in production
 ```
 
 **Generate secrets:**
@@ -276,6 +280,27 @@ Public polling endpoint — no auth required.
 
 On `completed`, the `result` field contains the Application (or SavedJob) object.  
 On `failed`, the `failedReason` field contains the error message.
+
+---
+
+## 🔒 Security & Performance
+
+### Middleware stack (applied in `src/index.ts`)
+
+| Middleware | Applied | Purpose |
+|------------|---------|----------|
+| `helmet()` | All routes — **first** | Sets 15 secure HTTP headers (`X-Frame-Options`, `X-Content-Type-Options`, `Strict-Transport-Security`, `Content-Security-Policy`, etc.) |
+| `compression()` | All routes — **production only** | Gzip-compresses JSON responses (~60–80% size reduction). Skipped in development to keep logs readable. If an nginx reverse proxy is added, disable this and let nginx handle it. |
+| `cors()` | All routes | Restricts cross-origin requests to the origin defined by `CORS_ORIGIN`. Required because the frontend is a browser-based SPA — Docker networking does not bypass browser CORS enforcement. |
+
+### Rate limiting (applied per route in `src/routes/auth.route.ts`)
+
+| Limiter | Routes | Window | Max requests | Purpose |
+|---------|--------|--------|-------------|----------|
+| `authLimiter` | `POST /login`, `POST /refresh` | 15 min | 10 | Prevents brute-force credential attacks and token-refresh flooding |
+| `signupLimiter` | `POST /signup/jobseeker`, `POST /signup/recruiter` | 1 hour | 5 | Prevents automated account creation spam |
+
+On limit breach, the API returns `429 Too Many Requests` with a JSON error body and standard `RateLimit-*` headers (RFC 6585).
 
 ---
 
