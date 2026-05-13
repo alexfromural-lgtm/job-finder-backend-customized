@@ -55,6 +55,20 @@ export function setRefreshTokenCookie(res: Response, refreshToken: string) {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  });
+}
+
+/**
+ * Sets the access token as an HTTP-only cookie.
+ * Short-lived (15 min) to match ACCESS_TOKEN_EXPIRES_IN.
+ * JS cannot read this cookie, eliminating XSS-based token theft.
+ */
+export function setAccessTokenCookie(res: Response, accessToken: string) {
+  res.cookie("accessToken", accessToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 15 * 60 * 1000, // 15 minutes
   });
 }

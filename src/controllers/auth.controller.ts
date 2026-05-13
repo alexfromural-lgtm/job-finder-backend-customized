@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import * as AuthService from "../services/auth.service";
 import { AuthRequest } from "../middleware/auth.middleware";
-import { setRefreshTokenCookie } from "../utils/auth.utils";
+import { setRefreshTokenCookie, setAccessTokenCookie } from "../utils/auth.utils";
 
 export const signupJobSeeker = async (req: Request, res: Response) => {
   try {
@@ -13,7 +13,8 @@ export const signupJobSeeker = async (req: Request, res: Response) => {
     );
 
     setRefreshTokenCookie(res, refreshToken);
-    res.status(201).json({ accessToken });
+    setAccessTokenCookie(res, accessToken);
+    res.status(201).json({ message: 'Signed up successfully' });
   } catch (error: Error | any) {
     res.status(400).json({ error: error.message });
   }
@@ -30,7 +31,8 @@ export const signupRecruitor = async (req: Request, res: Response) => {
     });
 
     setRefreshTokenCookie(res, refreshToken);
-    res.status(201).json({ accessToken });
+    setAccessTokenCookie(res, accessToken);
+    res.status(201).json({ message: 'Signed up successfully' });
   } catch (error: Error | any) {
     res.status(400).json({ error: error.message });
   }
@@ -56,7 +58,8 @@ export const login = async (req: Request, res: Response) => {
     );
 
     setRefreshTokenCookie(res, refreshToken);
-    res.status(200).json({ accessToken });
+    setAccessTokenCookie(res, accessToken);
+    res.status(200).json({ message: 'Logged in successfully' });
   } catch (error: Error | any) {
     res.status(400).json({ error: error.message });
   }
@@ -74,7 +77,8 @@ export const refreshTokens = async (req: Request, res: Response) => {
     const { accessToken, refreshToken } = await AuthService.refreshTokens(token);
 
     setRefreshTokenCookie(res, refreshToken);
-    res.status(200).json({ accessToken });
+    setAccessTokenCookie(res, accessToken);
+    res.status(200).json({ message: 'Token refreshed' });
   } catch (error: Error | any) {
     res.status(401).json({ error: "Invalid or expired refresh token" });
   }
@@ -82,11 +86,13 @@ export const refreshTokens = async (req: Request, res: Response) => {
 
 export const logout = async (_req: Request, res: Response) => {
   try {
-    res.clearCookie("refreshToken", {
+    const cookieOpts = {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-    });
+      sameSite: "lax" as const,
+    };
+    res.clearCookie("refreshToken", cookieOpts);
+    res.clearCookie("accessToken", cookieOpts);
 
     res.json({ message: "Logged out successfully" });
   } catch (err: Error | any) {
