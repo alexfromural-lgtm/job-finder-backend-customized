@@ -162,6 +162,12 @@ Base URL: `http://localhost:5002/api`
 ```
 Response: `{ "accessToken": "<JWT>" }` + `Set-Cookie: refreshToken=<JWT>; HttpOnly`
 
+**Refresh** `POST /api/auth/refresh` _(requires `refreshToken` HTTP-only cookie)_
+```json
+{ "accessToken": "<new-JWT>" }
+```
+> Issues a fresh access token (and rotates the refresh token cookie) using the HTTP-only `refreshToken` cookie. Called automatically by the frontend interceptor on `401` responses.
+
 **Get Me** `GET /api/auth/me` _(requires `Authorization: Bearer <accessToken>`)_
 ```json
 {

@@ -1,5 +1,34 @@
-# Force Unix line endings for shell scripts executed inside Linux containers
+# Normalize all text files to LF in the repository (prevents LF/CRLF warnings)
+*           text=auto eol=lf
+
+# Source code
+*.ts        text eol=lf
+*.js        text eol=lf
+*.json      text eol=lf
+*.md        text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+*.env       text eol=lf
+*.env.*     text eol=lf
+
+# Shell scripts — must stay LF for Linux containers
 *.sh        text eol=lf
 *.bash      text eol=lf
 gradlew     text eol=lf
+
+# Windows batch files — keep CRLF
+*.bat       text eol=crlf
 gradlew.bat text eol=crlf
+
+# Binary files — no line-ending conversion
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.ico       binary
+*.svg       binary
+*.woff      binary
+*.woff2     binary
+*.ttf       binary
+*.eot       binary
+*.otf       binary
