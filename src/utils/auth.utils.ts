@@ -5,6 +5,7 @@ import {
   generateAccessToken,
   generateRefreshToken,
 } from "./token";
+import { IS_PRODUCTION } from "../config/env";
 
 /**
  * Validates that email and password are provided.
@@ -53,7 +54,7 @@ export const generateTokensForUser = async (userId: string, roles: Role[]) => {
 export function setRefreshTokenCookie(res: Response, refreshToken: string) {
   res.cookie("refreshToken", refreshToken, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: IS_PRODUCTION,
     sameSite: "lax",
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   });
@@ -67,7 +68,7 @@ export function setRefreshTokenCookie(res: Response, refreshToken: string) {
 export function setAccessTokenCookie(res: Response, accessToken: string) {
   res.cookie("accessToken", accessToken, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: IS_PRODUCTION,
     sameSite: "lax",
     maxAge: 15 * 60 * 1000, // 15 minutes
   });

@@ -10,20 +10,28 @@ import recruiterRoutes from "./routes/recruiter.route";
 import jobRoutes from "./routes/job.route";
 import queueRoutes from "./routes/queue.route";
 import "./queue/worker"; // start the worker on server boot
+import { ENV, IS_PRODUCTION, IS_DEVELOPMENT } from "./config/env";
 
 dotenv.config();
 
+// ── Environment constants ──────────────────────────────────────────────────────
+// In development the frontend dev-server runs on localhost:3000 by default.
+// In production CORS_ORIGIN must be explicitly set via an env variable.
+const CORS_ORIGIN =
+  ENV.CORS_ORIGIN ?? (IS_DEVELOPMENT ? "http://localhost:3000" : undefined);
+
+// ── App setup ─────────────────────────────────────────────────────────────────
 const app = express();
 
 // Security: set secure HTTP headers (should be first)
 app.use(helmet());
 
 // Performance: gzip compression in production
-if (process.env.NODE_ENV === "production") {
+if (IS_PRODUCTION) {
   app.use(compression());
 }
 
-app.use(cors({ origin: process.env.CORS_ORIGIN || "http://localhost:3000", credentials: true }));
+app.use(cors({ origin: CORS_ORIGIN, credentials: true }));
 app.use(express.json());
 app.use(cookieParser());
 
@@ -33,8 +41,6 @@ app.use("/api/recruiter", recruiterRoutes);
 app.use("/api/jobs", jobRoutes);
 app.use("/api/queue", queueRoutes);
 
-const PORT = process.env.PORT || 5002;
-
-app.listen(PORT, () => {
-  console.log(`Server is running on port http://localhost:${PORT}`);
+app.listen(ENV.PORT, () => {
+  console.log(`Server is running on http://localhost:${ENV.PORT} [${ENV.NODE_ENV}]`);
 });

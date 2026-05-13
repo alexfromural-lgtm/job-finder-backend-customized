@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import * as AuthService from "../services/auth.service";
 import { AuthRequest } from "../middleware/auth.middleware";
 import { setRefreshTokenCookie, setAccessTokenCookie } from "../utils/auth.utils";
+import { IS_PRODUCTION } from "../config/env";
 
 export const signupJobSeeker = async (req: Request, res: Response) => {
   try {
@@ -88,7 +89,7 @@ export const logout = async (_req: Request, res: Response) => {
   try {
     const cookieOpts = {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: IS_PRODUCTION,
       sameSite: "lax" as const,
     };
     res.clearCookie("refreshToken", cookieOpts);
