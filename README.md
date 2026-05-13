@@ -1,6 +1,6 @@
 # ⚡ Job Finder — Backend API
 
-A role-based job board REST API built with **Express.js**, **PostgreSQL**, **Prisma ORM**, and **Redis/Bull** message queuing. Supports Job Seeker and Recruiter roles with JWT access tokens + HTTP-only refresh token cookies. High-traffic write operations (apply to job, save job) are handled asynchronously via a Bull queue.
+A role-based job board REST API built with **Express.js**, **PostgreSQL**, **Prisma ORM**, and **Redis/Bull** message queuing. Supports Job Seeker and Recruiter roles with **dual HTTP-only cookie auth** — both the short-lived access token and the long-lived refresh token are set as `HttpOnly; SameSite=Lax` cookies, so no token ever touches JavaScript. High-traffic write operations (apply to job, save job) are handled asynchronously via a Bull queue.
 
 ---
 
@@ -132,11 +132,11 @@ Base URL: `http://localhost:5002/api`
 |--------|----------|------|-------------|
 | `POST` | `/signup/jobseeker` | — | Register as Job Seeker |
 | `POST` | `/signup/recruiter` | — | Register as Recruiter (includes company fields) |
-| `POST` | `/login` | — | Login; returns `accessToken` + sets `refreshToken` cookie |
-| `POST` | `/logout` | — | Clears `refreshToken` cookie |
-| `POST` | `/refresh` | Cookie | Issue new access + refresh tokens |
-| `GET`  | `/me` | Bearer | Get current authenticated user |
-| `POST` | `/upgrade/recruiter` | Bearer (JOB_SEEKER) | Upgrade Job Seeker account to Recruiter |
+| `POST` | `/login` | — | Login; sets `accessToken` + `refreshToken` HTTP-only cookies |
+| `POST` | `/logout` | — | Clears both `accessToken` and `refreshToken` cookies |
+| `POST` | `/refresh` | Cookie | Rotates both tokens; sets fresh cookies |
+| `GET`  | `/me` | Cookie (`accessToken`) | Get current authenticated user |
+| `POST` | `/upgrade/recruiter` | Cookie (JOB_SEEKER) | Upgrade Job Seeker account to Recruiter |
 
 **Signup — Job Seeker** `POST /api/auth/signup/jobseeker`
 ```json
@@ -160,15 +160,18 @@ Base URL: `http://localhost:5002/api`
 ```json
 { "email": "john@example.com", "password": "secret123" }
 ```
-Response: `{ "accessToken": "<JWT>" }` + `Set-Cookie: refreshToken=<JWT>; HttpOnly`
+Response: `{ "message": "Logged in successfully" }` + two cookies:
+- `Set-Cookie: accessToken=<JWT>; HttpOnly; SameSite=Lax` (15 min)
+- `Set-Cookie: refreshToken=<JWT>; HttpOnly; SameSite=Lax` (7 days)
+
+> The `accessToken` is **never returned in the response body** — it is inaccessible to JavaScript, eliminating XSS-based token theft.
 
 **Refresh** `POST /api/auth/refresh` _(requires `refreshToken` HTTP-only cookie)_
-```json
-{ "accessToken": "<new-JWT>" }
-```
-> Issues a fresh access token (and rotates the refresh token cookie) using the HTTP-only `refreshToken` cookie. Called automatically by the frontend interceptor on `401` responses.
 
-**Get Me** `GET /api/auth/me` _(requires `Authorization: Bearer <accessToken>`)_
+Response: `{ "message": "Token refreshed" }` + two refreshed cookies (same options as login).
+> Rotates both tokens. Called automatically by the frontend interceptor on `401` responses.
+
+**Get Me** `GET /api/auth/me` _(requires `accessToken` HTTP-only cookie)_
 ```json
 {
   "user": {
@@ -212,7 +215,7 @@ Response: `{ "accessToken": "<JWT>" }` + `Set-Cookie: refreshToken=<JWT>; HttpOn
 
 ### Job Seeker — `/api/jobseeker`
 
-All endpoints require `Authorization: Bearer <accessToken>` with role `JOB_SEEKER`.
+All endpoints require an `accessToken` HTTP-only cookie and role `JOB_SEEKER`.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -236,7 +239,7 @@ All endpoints require `Authorization: Bearer <accessToken>` with role `JOB_SEEKE
 
 ### Recruiter — `/api/recruiter`
 
-All endpoints require `Authorization: Bearer <accessToken>` with role `RECRUITER`.
+All endpoints require an `accessToken` HTTP-only cookie and role `RECRUITER`.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
