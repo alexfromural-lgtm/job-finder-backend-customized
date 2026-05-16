@@ -17,7 +17,7 @@ export const getProfile = async (
       return;
     }
 
-    res.status(200).json({ data: profile });
+    res.status(200).json({ profile });
   } catch (err) {
     next(err);
   }
@@ -31,7 +31,7 @@ export const updateProfile = async (
   try {
     const userId = req.userId!;
     const profile = await RecruiterService.updateRecruiterProfile(userId, req.body);
-    res.status(200).json({ data: profile });
+    res.status(200).json({ profile });
   } catch (err) {
     next(err);
   }
@@ -46,8 +46,8 @@ export const getApplicationsForJob = async (
     const userId = req.userId!;
     const jobId = req.params.jobId;
 
-    const data = await RecruiterService.getApplicationsForJob(userId, jobId);
-    res.status(200).json({ data });
+    const applications = await RecruiterService.getApplicationsForJob(userId, jobId);
+    res.status(200).json({ applications });
   } catch (err) {
     next(err);
   }
@@ -74,7 +74,7 @@ export const updateApplicationStatus = async (
       applicationId,
       parsed.data.status
     );
-    res.status(200).json({ data: application });
+    res.status(200).json({ application });
   } catch (err) {
     next(err);
   }

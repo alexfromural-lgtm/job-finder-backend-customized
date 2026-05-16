@@ -13,7 +13,7 @@ export const getJobsByRecruiter = async (
     if (!recruiter) return;
 
     const jobs = await JobService.getJobsByRecruiter(recruiter.id);
-    res.status(200).json({ data: jobs });
+    res.status(200).json({ jobs });
   } catch (err) {
     next(err);
   }
@@ -29,7 +29,7 @@ export const createJob = async (
     if (!recruiter) return;
 
     const job = await JobService.createJob(recruiter.id, req.body);
-    res.status(201).json({ message: "Job created successfully!", data: job });
+    res.status(201).json({ message: "Job created successfully!", job });
   } catch (err) {
     next(err);
   }
@@ -49,7 +49,7 @@ export const getJobById = async (
       return;
     }
 
-    res.status(200).json({ data: job });
+    res.status(200).json({ job });
   } catch (err) {
     next(err);
   }
@@ -66,7 +66,7 @@ export const updateJob = async (
 
     const jobId = req.params.id;
     const job = await JobService.updateJob(jobId, recruiter.id, req.body);
-    res.status(200).json({ message: "Job updated successfully!", data: job });
+    res.status(200).json({ message: "Job updated successfully!", job });
   } catch (err) {
     next(err);
   }
@@ -109,7 +109,7 @@ export const getAllJobs = async (
     });
 
     res.status(200).json({
-      data: result.jobs,
+      jobs: result.jobs,
       meta: {
         total: result.total,
         page: result.page,

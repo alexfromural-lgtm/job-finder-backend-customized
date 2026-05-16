@@ -56,7 +56,7 @@ export const upgradeToRecruiter = async (
     // Re-issue cookies so the RECRUITER role is active immediately
     setRefreshTokenCookie(res, tokens.refreshToken);
     setAccessTokenCookie(res, tokens.accessToken);
-    res.status(200).json({ data: user });
+    res.status(200).json({ user });
   } catch (err) {
     next(err);
   }
@@ -130,7 +130,7 @@ export const getMe = async (
   try {
     const userId = req.userId!;
     const user = await AuthService.getCurrentUser(userId);
-    res.json({ data: user });
+    res.json({ user });
   } catch (err) {
     next(err);
   }
