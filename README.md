@@ -379,6 +379,55 @@ Both `accessToken` and `refreshToken` are set as `HttpOnly; SameSite=Lax` cookie
 
 ---
 
+### AWS deployment & cookie architecture
+
+#### Runtime cost comparison (Node.js vs Go vs Java Spring Boot)
+
+| Runtime | Memory footprint | Cold-start speed | Lambda cost | Notes |
+|---------|-----------------|-----------------|-------------|-------|
+| **Go** | ~31 MB | Fastest | Lowest | Best density on Fargate; cheapest per-invocation on Lambda |
+| **Node.js** | Moderate | Fast | Mid | Ideal for I/O-bound apps (e.g. this job-finder service); good dev velocity |
+| **Java Spring Boot** | High | Slowest | Highest | Requires larger instance allocations; poor serverless cold-start story |
+
+> **Current stack (Node.js)** is a pragmatic choice for an I/O-bound service. Go would lower infrastructure cost at very high scale, but the gap is negligible for typical job-board traffic volumes.
+
+#### HttpOnly cookie behaviour per AWS hosting type
+
+| Hosting | Cookie handling | Notes |
+|---------|----------------|-------|
+| **AWS Lambda** | Must map `Set-Cookie` header in function response | Lightweight runtimes (Go) reduce cost per invocation |
+| **AWS Fargate** | Handled natively behind an ALB | Standard cookie flow; no special mapping needed |
+| **Amazon EC2** | Full native control over network stack | Most flexible; headers processed directly by the process |
+
+#### `sameSite` decision matrix for AWS deployments
+
+The correct `sameSite` value depends entirely on how frontend and backend are hosted:
+
+| Deployment topology | `sameSite` needed | `secure` required | Notes |
+|--------------------|-------------------|-------------------|-------|
+| Same domain, ALB path-based routing (`/api/*` → backend) | `"lax"` ✅ | Yes (HTTPS) | Current `"lax"` setting works as-is |
+| Different subdomains (`app.example.com` vs `api.example.com`) | `"none"` ⚠️ | **Must be `true`** | Browsers treat subdomains as cross-site; `"lax"` silently drops cookies on background `fetch` calls |
+| Completely different domains | `"none"` ⚠️ | **Must be `true`** | Same as above |
+
+**Current code (`sameSite: "lax"`)** is correct for local development and for a same-domain production deployment. If the frontend and backend are ever split onto separate subdomains or domains, the cookie options in `src/utils/auth.utils.ts` must be updated to:
+
+```typescript
+res.cookie("accessToken", accessToken, {
+  httpOnly: true,
+  secure: true,       // Must be true for SameSite=None
+  sameSite: "none",   // Explicitly allows cross-site cookie passing
+  maxAge: ENV.ACCESS_TOKEN_MAX_AGE_MS,
+});
+```
+
+The same change applies to `setRefreshTokenCookie`. Note that `SameSite=None` **requires HTTPS** — a valid TLS certificate (e.g. via AWS ACM + ALB) is non-negotiable.
+
+#### Silent token refresh (already implemented)
+
+The frontend `axiosClient.ts` intercepts `401` responses, calls `/auth/refresh` once, and replays the original request — all transparently, with no token values ever exposed to JavaScript. This covers the main operational complexity of `HttpOnly`-cookie-based auth across domains.
+
+---
+
 ### Rate limiting (applied per route in `src/routes/auth.route.ts`)
 
 | Limiter | Routes | Window | Max requests | Purpose |
