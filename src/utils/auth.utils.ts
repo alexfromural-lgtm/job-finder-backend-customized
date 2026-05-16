@@ -32,6 +32,33 @@ export const handleAuthAwareError = (
 };
 
 /**
+ * Maps auth controller errors to semantically correct HTTP status codes.
+ * - 401 for invalid credentials or expired tokens
+ * - 403 for role/permission violations
+ * - 404 for missing users/resources
+ * - 409 for duplicate resource conflicts (e.g. email already exists)
+ * - 400 for all other validation errors
+ */
+export const handleAuthControllerError = (err: any, res: Response) => {
+  const msg: string = err?.message ?? "Unknown error";
+
+  if (msg.includes("Invalid email or password") || msg.includes("expired")) {
+    return res.status(401).json({ error: msg });
+  }
+  if (msg.includes("not authorized") || msg.includes("Only Job Seekers")) {
+    return res.status(403).json({ error: msg });
+  }
+  if (msg.includes("not found") || msg.includes("Not found")) {
+    return res.status(404).json({ error: msg });
+  }
+  if (msg.includes("already exists")) {
+    return res.status(409).json({ error: msg });
+  }
+
+  return res.status(400).json({ error: msg });
+};
+
+/**
  * Checks if a user already exists by email.
  */
 export const checkUserExistsByEmail = async (email: string) => {
