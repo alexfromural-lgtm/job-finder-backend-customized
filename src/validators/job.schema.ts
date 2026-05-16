@@ -8,3 +8,6 @@ export const jobSchema = z.object({
   salaryRange: z.string().optional(),
   category: z.string().optional(),
 });
+
+export type JobInput = z.infer<typeof jobSchema>;
+export type JobUpdateInput = z.infer<ReturnType<typeof jobSchema.partial>>;

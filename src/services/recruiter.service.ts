@@ -1,5 +1,6 @@
 import { ApplicationStatus } from "@prisma/client";
 import prisma from "../prisma/client";
+import { AppError } from "../errors/AppError";
 
 export const getRecruiterProfile = async (userId: string) => {
   const profile = await prisma.recruiterProfile.findUnique({
@@ -49,12 +50,12 @@ export const getApplicationsForJob = async (
     where: { userId },
   });
 
-  if (!recruiter) throw new Error("Recruiter profile not found");
+  if (!recruiter) throw new AppError("Recruiter profile not found", 404);
 
   const job = await prisma.job.findUnique({ where: { id: jobId } });
-  if (!job) throw new Error("Job not found");
+  if (!job) throw new AppError("Job not found", 404);
   if (job.recruiterId !== recruiter.id)
-    throw new Error("You are not authorized to view applications for this job");
+    throw new AppError("You are not authorized to view applications for this job", 403);
 
   const applications = await prisma.application.findMany({
     where: { jobId },
@@ -82,16 +83,16 @@ export const updateApplicationStatus = async (
     where: { userId },
   });
 
-  if (!recruiter) throw new Error("Recruiter profile not found");
+  if (!recruiter) throw new AppError("Recruiter profile not found", 404);
 
   const application = await prisma.application.findUnique({
     where: { id: applicationId },
     include: { job: true },
   });
 
-  if (!application) throw new Error("Application not found");
+  if (!application) throw new AppError("Application not found", 404);
   if (application.job.recruiterId !== recruiter.id)
-    throw new Error("You are not authorized to update this application");
+    throw new AppError("You are not authorized to update this application", 403);
 
   const updated = await prisma.application.update({
     where: { id: applicationId },

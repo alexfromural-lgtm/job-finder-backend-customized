@@ -1,10 +1,17 @@
-import { Request, Response } from "express";
+import { Request, Response, NextFunction } from "express";
 import * as AuthService from "../services/auth.service";
 import { AuthRequest } from "../middleware/auth.middleware";
-import { setRefreshTokenCookie, setAccessTokenCookie, handleAuthControllerError } from "../utils/auth.utils";
+import {
+  setRefreshTokenCookie,
+  setAccessTokenCookie,
+} from "../utils/auth.utils";
 import { IS_PRODUCTION } from "../config/env";
 
-export const signupJobSeeker = async (req: Request, res: Response) => {
+export const signupJobSeeker = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     const { name, email, password } = req.body;
     const { accessToken, refreshToken } = await AuthService.signupJobSeeker(
@@ -15,58 +22,68 @@ export const signupJobSeeker = async (req: Request, res: Response) => {
 
     setRefreshTokenCookie(res, refreshToken);
     setAccessTokenCookie(res, accessToken);
-    res.status(201).json({ message: 'Signed up successfully' });
-  } catch (err: any) {
-    handleAuthControllerError(err, res);
+    res.status(201).json({ message: "Signed up successfully" });
+  } catch (err) {
+    next(err);
   }
 };
 
-export const signupRecruitor = async (req: Request, res: Response) => {
+export const signupRecruiter = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   try {
-    const { name, email, password } = req.body;
-    const { accessToken, refreshToken } = await AuthService.signupRecruitor({
-      name,
-      email,
-      password,
-      ...req.body,
-    });
+    const { accessToken, refreshToken } = await AuthService.signupRecruiter(req.body);
 
     setRefreshTokenCookie(res, refreshToken);
     setAccessTokenCookie(res, accessToken);
-    res.status(201).json({ message: 'Signed up successfully' });
-  } catch (err: any) {
-    handleAuthControllerError(err, res);
+    res.status(201).json({ message: "Signed up successfully" });
+  } catch (err) {
+    next(err);
   }
 };
 
-export const upgradeToRecruiter = async (req: AuthRequest, res: Response) => {
+export const upgradeToRecruiter = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     const userId = req.userId!;
-    const upgradedUser = await AuthService.upgradeToRecruiter(userId, req.body);
+    const { user, tokens } = await AuthService.upgradeToRecruiter(userId, req.body);
 
-    res.status(201).json({ data: upgradedUser });
-  } catch (err: any) {
-    handleAuthControllerError(err, res);
+    // Re-issue cookies so the RECRUITER role is active immediately
+    setRefreshTokenCookie(res, tokens.refreshToken);
+    setAccessTokenCookie(res, tokens.accessToken);
+    res.status(200).json({ data: user });
+  } catch (err) {
+    next(err);
   }
 };
 
-export const login = async (req: Request, res: Response) => {
+export const login = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     const { email, password } = req.body;
-    const { accessToken, refreshToken } = await AuthService.login(
-      email,
-      password
-    );
+    const { accessToken, refreshToken } = await AuthService.login(email, password);
 
     setRefreshTokenCookie(res, refreshToken);
     setAccessTokenCookie(res, accessToken);
-    res.status(200).json({ message: 'Logged in successfully' });
-  } catch (err: any) {
-    handleAuthControllerError(err, res);
+    res.status(200).json({ message: "Logged in successfully" });
+  } catch (err) {
+    next(err);
   }
 };
 
-export const refreshTokens = async (req: Request, res: Response) => {
+export const refreshTokens = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     const token = req.cookies?.refreshToken;
 
@@ -79,13 +96,17 @@ export const refreshTokens = async (req: Request, res: Response) => {
 
     setRefreshTokenCookie(res, refreshToken);
     setAccessTokenCookie(res, accessToken);
-    res.status(200).json({ message: 'Token refreshed' });
-  } catch (err: any) {
-    handleAuthControllerError(err, res);
+    res.status(200).json({ message: "Token refreshed" });
+  } catch (err) {
+    next(err);
   }
 };
 
-export const logout = async (_req: Request, res: Response) => {
+export const logout = async (
+  _req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     const cookieOpts = {
       httpOnly: true,
@@ -96,17 +117,21 @@ export const logout = async (_req: Request, res: Response) => {
     res.clearCookie("accessToken", cookieOpts);
 
     res.json({ message: "Logged out successfully" });
-  } catch (err: any) {
-    handleAuthControllerError(err, res);
+  } catch (err) {
+    next(err);
   }
 };
 
-export const getMe = async (req: AuthRequest, res: Response) => {
+export const getMe = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     const userId = req.userId!;
     const user = await AuthService.getCurrentUser(userId);
-    res.json({ user });
-  } catch (err: any) {
-    handleAuthControllerError(err, res);
+    res.json({ data: user });
+  } catch (err) {
+    next(err);
   }
 };

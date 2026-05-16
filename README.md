@@ -16,7 +16,7 @@ A role-based job board REST API built with **Express.js**, **PostgreSQL**, **Pri
 | Bull | Job queue for async DB write operations |
 | JWT | Access & refresh token auth |
 | bcrypt | Password hashing |
-| Zod | Request validation |
+| Zod | Request validation + startup env schema validation |
 | helmet | Secure HTTP response headers |
 | express-rate-limit | Brute-force & signup spam protection |
 | compression | Gzip response compression (production) |
@@ -28,20 +28,32 @@ A role-based job board REST API built with **Express.js**, **PostgreSQL**, **Pri
 
 ```
 src/
-├── controllers/     # Route handlers (auth, job, jobseeker, recruiter)
-├── services/        # Business logic layer
-├── routes/          # Express router definitions (includes queue.route.ts)
-├── middleware/      # requireAuth, authorizeRoles, validate
-├── validators/      # Zod schemas
-├── prisma/          # Prisma client singleton
-├── queue/           # Bull queue infrastructure
-│   ├── queue.ts     # Shared Bull queue instance (db-write-queue)
-│   ├── worker.ts    # Queue processor — dispatches to service layer
-│   └── types.ts     # QueuePayload discriminated union
-└── utils/           # token.ts, hash.ts, auth.utils.ts, job.utils.ts
+├── config/
+│   └── env.ts                       # Zod-validated ENV — exits immediately if vars are missing/invalid
+├── controllers/                     # Route handlers (auth, job, jobseeker, recruiter)
+├── errors/
+│   └── AppError.ts                  # Typed application error (message + HTTP status code)
+├── middleware/
+│   ├── auth.middleware.ts            # requireAuth, authorizeRoles
+│   ├── validate.middleware.ts        # Zod request body validation
+│   └── errorHandler.middleware.ts   # Global Express error handler (mounted last in index.ts)
+├── services/                        # Business logic layer
+├── routes/                          # Express router definitions (includes queue.route.ts)
+├── validators/                      # Zod schemas
+│   ├── auth.schema.ts               # loginSchema (NEW)
+│   ├── jobseeker.schema.ts          # signupSchema + updateJobSeekerProfileSchema (NEW)
+│   ├── application.schema.ts        # applicationSchema + applicationStatusSchema (NEW)
+│   ├── job.schema.ts                # jobSchema + JobInput / JobUpdateInput types (NEW)
+│   └── recruiter.schema.ts          # recruiterSignupSchema + recruiter-profile schema
+├── prisma/                          # Prisma client singleton
+├── queue/                           # Bull queue infrastructure
+│   ├── queue.ts                     # Shared Bull queue instance (db-write-queue)
+│   ├── worker.ts                    # Queue processor — dispatches to service layer
+│   └── types.ts                     # QueuePayload discriminated union
+└── utils/                           # token.ts, hash.ts, auth.utils.ts, job.utils.ts
 prisma/
-├── schema.prisma    # Database schema & enums
-└── seed.ts          # Dev seed data
+├── schema.prisma                    # Database schema & enums
+└── seed.ts                          # Dev seed data
 ```
 
 ---
@@ -75,12 +87,16 @@ cp .env.sample .env
 DATABASE_URL=postgresql://job_finder_user:secure_password_123@db:5432/job_finder
 ACCESS_TOKEN_SECRET=<32-char random string>
 REFRESH_TOKEN_SECRET=<32-char random string>
+ACCESS_TOKEN_EXPIRES_IN=15m
+REFRESH_TOKEN_EXPIRES_IN=7d
 PORT=5002
 NODE_ENV=development          # set to "production" to enable gzip compression
 REDIS_URL=redis://redis:6379
 QUEUE_CONCURRENCY=5
 CORS_ORIGIN=http://localhost:3000   # update to your frontend domain in production
 ```
+
+> **Strict env validation:** `src/config/env.ts` now parses all variables through a Zod schema at startup. If any required variable is missing or invalid (e.g. a secret shorter than 16 characters), the process **exits immediately** with a descriptive error rather than failing silently at runtime.
 
 **Generate secrets:**
 
@@ -128,6 +144,8 @@ This creates demo users:
 
 Base URL: `http://localhost:5002/api`
 
+> **Standardised response shape:** All successful responses wrap their payload under a `data` key — e.g. `{ "data": { ... } }`. Error responses always return `{ "error": "<message>" }`.
+
 ---
 
 ### Auth — `/api/auth`
@@ -161,6 +179,8 @@ Base URL: `http://localhost:5002/api`
 ```
 
 **Login** `POST /api/auth/login`
+
+Now Zod-validated via `loginSchema` (requires a valid email format and a non-empty password).
 ```json
 { "email": "john@example.com", "password": "secret123" }
 ```
@@ -169,16 +189,17 @@ Response: `{ "message": "Logged in successfully" }` + two cookies:
 - `Set-Cookie: refreshToken=<JWT>; HttpOnly; SameSite=Lax` (7 days)
 
 > The `accessToken` is **never returned in the response body** — it is inaccessible to JavaScript, eliminating XSS-based token theft.
+> Deactivated accounts (`isActive: false`) are rejected with `403 Forbidden`.
 
 **Refresh** `POST /api/auth/refresh` _(requires `refreshToken` HTTP-only cookie)_
 
-Response: `{ "message": "Token refreshed" }` + two refreshed cookies (same options as login).
+Response: `{ "message": "Token refreshed" }` + two refreshed cookies.
 > Rotates both tokens. Called automatically by the frontend interceptor on `401` responses.
 
 **Get Me** `GET /api/auth/me` _(requires `accessToken` HTTP-only cookie)_
 ```json
 {
-  "user": {
+  "data": {
     "id": "uuid",
     "name": "John Doe",
     "email": "john@example.com",
@@ -190,6 +211,12 @@ Response: `{ "message": "Token refreshed" }` + two refreshed cookies (same optio
 }
 ```
 
+**Upgrade to Recruiter** `POST /api/auth/upgrade/recruiter` _(requires `JOB_SEEKER` cookie)_
+
+- Body: same shape as recruiter signup — now Zod-validated via `recruiterSignupSchema`.
+- Returns `409 Conflict` if the user already has a recruiter profile.
+- Re-issues fresh tokens immediately so the new `RECRUITER` role is active without a separate login.
+
 ---
 
 ### Jobs — `/api/jobs`
@@ -198,10 +225,12 @@ Response: `{ "message": "Token refreshed" }` + two refreshed cookies (same optio
 |--------|----------|------|-------------|
 | `GET` | `/all` | — | List all active jobs (supports `?search=`, `?category=`, `?location=`) |
 | `GET` | `/:id` | — | Get a single job by ID |
-| `GET` | `/recruiter` | Bearer (RECRUITER) | Get jobs posted by the authenticated recruiter |
-| `POST` | `/` | Bearer (RECRUITER) | Create a new job posting |
-| `PUT` | `/:id` | Bearer (RECRUITER) | Update a job (owner only) |
-| `DELETE` | `/:id` | Bearer (RECRUITER) | Delete a job (owner only) |
+| `GET` | `/recruiter` | Cookie (RECRUITER) | Get jobs posted by the authenticated recruiter |
+| `POST` | `/` | Cookie (RECRUITER) | Create a new job posting |
+| `PUT` | `/:id` | Cookie (RECRUITER) | Update a job (owner only) |
+| `DELETE` | `/:id` | Cookie (RECRUITER) | Delete a job (owner only) |
+
+**Search expansion:** `?search=` now matches against `title`, `description`, **and `requirements`** (previously only title + description).
 
 **Create / Update Job body:**
 ```json
@@ -224,7 +253,7 @@ All endpoints require an `accessToken` HTTP-only cookie and role `JOB_SEEKER`.
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `GET` | `/profile` | Get own Job Seeker profile |
-| `PATCH` | `/profile` | Update profile (bio, location, skills, education, experience, resumeUrl) |
+| `PATCH` | `/profile` | Update profile — now Zod-validated (`updateJobSeekerProfileSchema`) |
 | `POST` | `/apply/:jobId` | **Enqueue** an application — returns `202 Accepted` + `jobId` |
 | `GET` | `/applications` | List own applications |
 | `DELETE` | `/applications/:id` | Withdraw an application |
@@ -233,6 +262,19 @@ All endpoints require an `accessToken` HTTP-only cookie and role `JOB_SEEKER`.
 | `DELETE` | `/saved/:jobId` | Remove a saved job |
 
 > **Async writes:** `POST /apply/:jobId` and `POST /saved/:jobId` no longer block on the DB write. They immediately enqueue the work via Bull and return `202 Accepted` with a `{ jobId, status: "queued" }` body. The client must poll `GET /api/queue/job/:jobId` to track completion.
+
+**Profile update body** (`PATCH /profile`) — all fields optional:
+```json
+{
+  "bio": "Full-stack developer with 5 years experience.",
+  "location": "San Francisco, CA",
+  "skills": ["TypeScript", "React", "Node.js"],
+  "education": "B.Sc. Computer Science",
+  "experience": "Senior Engineer at Acme Corp (2022–present)",
+  "resumeUrl": "https://example.com/resume.pdf"
+}
+```
+Constraints: `bio` ≤ 500 chars, `location` ≤ 100 chars, `resumeUrl` must be a valid URL or empty string, `coverLetter` (apply) ≤ 2000 chars.
 
 **Apply response (202):**
 ```json
@@ -250,9 +292,14 @@ All endpoints require an `accessToken` HTTP-only cookie and role `RECRUITER`.
 | `GET` | `/profile` | Get own Recruiter/company profile |
 | `PATCH` | `/profile` | Update company profile (companyName, companyWebsite, description, industry) |
 | `GET` | `/jobs/:jobId/applications` | List applicants for a specific job |
-| `PATCH` | `/applications/:id/status` | Update application status |
+| `PATCH` | `/applications/:id/status` | Update application status — now Zod-validated (`applicationStatusSchema`) |
 
 **Application statuses:** `submitted` · `shortlisted` · `under_review` · `rejected`
+
+**Update status body** (`PATCH /applications/:id/status`):
+```json
+{ "status": "shortlisted" }
+```
 
 ---
 
@@ -283,6 +330,24 @@ On `failed`, the `failedReason` field contains the error message.
 
 ---
 
+## 🛡 Global Error Handling
+
+A centralised `errorHandler` middleware (`src/middleware/errorHandler.middleware.ts`) is mounted **last** in `src/index.ts`, after all routes. All controllers call `next(err)` instead of writing their own error responses.
+
+| Condition | HTTP Status | Response |
+|-----------|-------------|----------|
+| `AppError` instance | `err.statusCode` | `{ "error": err.message }` |
+| Prisma unique constraint (`P2002`) | `409` | `{ "error": "A record with that value already exists." }` |
+| JWT errors (`jwt expired`, `jwt malformed`, `invalid token`) | `401` | `{ "error": "<jwt message>" }` |
+| All other errors | `500` | `{ "error": "Internal server error" }` (detail logged server-side) |
+
+Throw a typed `AppError` from any service:
+```ts
+throw new AppError("Job not found", 404);
+```
+
+---
+
 ## 🔒 Security & Performance
 
 ### Middleware stack (applied in `src/index.ts`)
@@ -290,14 +355,15 @@ On `failed`, the `failedReason` field contains the error message.
 | Middleware | Applied | Purpose |
 |------------|---------|----------|
 | `helmet()` | All routes — **first** | Sets 15 secure HTTP headers (`X-Frame-Options`, `X-Content-Type-Options`, `Strict-Transport-Security`, `Content-Security-Policy`, etc.) |
-| `compression()` | All routes — **production only** | Gzip-compresses JSON responses (~60–80% size reduction). Skipped in development to keep logs readable. If an nginx reverse proxy is added, disable this and let nginx handle it. |
-| `cors()` | All routes | Restricts cross-origin requests to the origin defined by `CORS_ORIGIN`. Required because the frontend is a browser-based SPA — Docker networking does not bypass browser CORS enforcement. |
+| `compression()` | All routes — **production only** | Gzip-compresses JSON responses (~60–80% size reduction). Skipped in development to keep logs readable. |
+| `cors()` | All routes | Restricts cross-origin requests to the origin defined by `CORS_ORIGIN`. |
+| `errorHandler` | **Last** — after all routes | Global error handler. Converts `AppError`, Prisma errors, and JWT errors to structured JSON. |
 
 ### Rate limiting (applied per route in `src/routes/auth.route.ts`)
 
 | Limiter | Routes | Window | Max requests | Purpose |
 |---------|--------|--------|-------------|----------|
-| `authLimiter` | `POST /login`, `POST /refresh` | 15 min | 10 | Prevents brute-force credential attacks and token-refresh flooding |
+| `authLimiter` | `POST /login`, `POST /refresh` | 15 min | 10 | Prevents brute-force attacks and token-refresh flooding |
 | `signupLimiter` | `POST /signup/jobseeker`, `POST /signup/recruiter` | 1 hour | 5 | Prevents automated account creation spam |
 
 On limit breach, the API returns `429 Too Many Requests` with a JSON error body and standard `RateLimit-*` headers (RFC 6585).

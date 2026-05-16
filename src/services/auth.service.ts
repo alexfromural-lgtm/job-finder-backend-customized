@@ -1,7 +1,11 @@
 import { Role } from "@prisma/client";
 import prisma from "../prisma/client";
 import { comparePasswords, hashPassword } from "../utils/hash";
-import { validateCredentials, checkUserExistsByEmail, generateTokensForUser } from "../utils/auth.utils";
+import {
+  validateCredentials,
+  checkUserExistsByEmail,
+  generateTokensForUser,
+} from "../utils/auth.utils";
 import { verifyRefreshToken } from "../utils/token";
 import { RecruiterSignupInput } from "../validators/recruiter.schema";
 import { AppError } from "../errors/AppError";
@@ -28,7 +32,11 @@ export const signupJobSeeker = async (
   return generateTokensForUser(user.id, user.roles);
 };
 
-export const signupRecruitor = async (data: RecruiterSignupInput) => {
+/**
+ * Signup for a new recruiter account.
+ * (Note: previously named signupRecruitor — typo fixed)
+ */
+export const signupRecruiter = async (data: RecruiterSignupInput) => {
   const { name, email, password, companyName, companyWebsite, description, industry } = data;
 
   validateCredentials(email, password);
@@ -56,14 +64,24 @@ export const signupRecruitor = async (data: RecruiterSignupInput) => {
   return generateTokensForUser(user.id, user.roles);
 };
 
-export const upgradeToRecruiter = async (userId: string, data: RecruiterSignupInput) => {
+/**
+ * Upgrades an existing JOB_SEEKER to also have the RECRUITER role.
+ * Returns new tokens immediately so the user does not need to re-login.
+ */
+export const upgradeToRecruiter = async (
+  userId: string,
+  data: RecruiterSignupInput
+) => {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: { recruiter: true },
   });
 
   if (!user) throw new AppError("User not found", 404);
-  if (!user.roles.includes(Role.JOB_SEEKER)) throw new AppError("Only Job Seekers can upgrade to Recruiter", 403);
+  if (!user.roles.includes(Role.JOB_SEEKER))
+    throw new AppError("Only Job Seekers can upgrade to Recruiter", 403);
+  if (user.recruiter)
+    throw new AppError("User already has a recruiter profile", 409);
 
   const updatedUser = await prisma.user.update({
     where: { id: userId },
@@ -81,7 +99,9 @@ export const upgradeToRecruiter = async (userId: string, data: RecruiterSignupIn
     include: { recruiter: true },
   });
 
-  return updatedUser;
+  // Re-issue tokens so the new RECRUITER role is reflected immediately
+  const tokens = await generateTokensForUser(updatedUser.id, updatedUser.roles);
+  return { user: updatedUser, tokens };
 };
 
 export const login = async (email: string, password: string) => {
@@ -90,8 +110,10 @@ export const login = async (email: string, password: string) => {
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user) throw new AppError("Invalid email or password", 401);
 
+  if (!user.isActive) throw new AppError("Account is deactivated", 403);
+
   const valid = await comparePasswords(password, user.password);
-  if (!valid) throw new AppError("Invalid email or password", 401); // Same message for both cases — avoids leaking which field is wrong
+  if (!valid) throw new AppError("Invalid email or password", 401); // Same message — avoids leaking which field is wrong
 
   return generateTokensForUser(user.id, user.roles);
 };

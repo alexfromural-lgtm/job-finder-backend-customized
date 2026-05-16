@@ -1,11 +1,13 @@
-import { Response } from "express";
-import { ApplicationStatus } from "@prisma/client";
+import { Response, NextFunction } from "express";
 import { AuthRequest } from "../middleware/auth.middleware";
 import * as RecruiterService from "../services/recruiter.service";
-import { handleAuthAwareError } from "../utils/auth.utils";
-import { handleGenericError } from "../utils/job.utils";
+import { applicationStatusSchema } from "../validators/application.schema";
 
-export const getProfile = async (req: AuthRequest, res: Response) => {
+export const getProfile = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     const userId = req.userId!;
     const profile = await RecruiterService.getRecruiterProfile(userId);
@@ -16,48 +18,64 @@ export const getProfile = async (req: AuthRequest, res: Response) => {
     }
 
     res.status(200).json({ data: profile });
-  } catch (err: any) {
-    handleGenericError(err, res);
+  } catch (err) {
+    next(err);
   }
 };
 
-export const updateProfile = async (req: AuthRequest, res: Response) => {
+export const updateProfile = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     const userId = req.userId!;
     const profile = await RecruiterService.updateRecruiterProfile(userId, req.body);
     res.status(200).json({ data: profile });
-  } catch (err: any) {
-    handleGenericError(err, res);
+  } catch (err) {
+    next(err);
   }
 };
 
-export const getApplicationsForJob = async (req: AuthRequest, res: Response) => {
+export const getApplicationsForJob = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     const userId = req.userId!;
     const jobId = req.params.jobId;
 
     const data = await RecruiterService.getApplicationsForJob(userId, jobId);
     res.status(200).json({ data });
-  } catch (err: any) {
-    handleAuthAwareError(err, res);
+  } catch (err) {
+    next(err);
   }
 };
 
-export const updateApplicationStatus = async (req: AuthRequest, res: Response) => {
+export const updateApplicationStatus = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     const userId = req.userId!;
     const applicationId = req.params.id;
-    const { status } = req.body as { status: ApplicationStatus };
 
-    const validStatuses = ["submitted", "shortlisted", "rejected", "under_review"];
-    if (!validStatuses.includes(status)) {
-      res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(", ")}` });
+    // Validate status via Zod (schema also validates, but belt-and-suspenders)
+    const parsed = applicationStatusSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.issues[0].message });
       return;
     }
 
-    const application = await RecruiterService.updateApplicationStatus(userId, applicationId, status);
-    res.status(200).json({ application });
-  } catch (err: any) {
-    handleAuthAwareError(err, res);
+    const application = await RecruiterService.updateApplicationStatus(
+      userId,
+      applicationId,
+      parsed.data.status
+    );
+    res.status(200).json({ data: application });
+  } catch (err) {
+    next(err);
   }
 };

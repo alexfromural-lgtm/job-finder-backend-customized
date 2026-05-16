@@ -1,4 +1,5 @@
 import prisma from "../prisma/client";
+import { AppError } from "../errors/AppError";
 
 export const getJobSeekerProfile = async (userId: string) => {
   const profile = await prisma.jobSeekerProfile.findUnique({
@@ -50,16 +51,16 @@ export const applyToJob = async (
     where: { userId },
   });
 
-  if (!jobSeeker) throw new Error("Job seeker profile not found");
+  if (!jobSeeker) throw new AppError("Job seeker profile not found", 404);
 
   const job = await prisma.job.findUnique({ where: { id: jobId } });
-  if (!job) throw new Error("Job not found");
-  if (!job.isActive) throw new Error("This job is no longer active");
+  if (!job) throw new AppError("Job not found", 404);
+  if (!job.isActive) throw new AppError("This job is no longer active", 410);
 
   const existing = await prisma.application.findFirst({
     where: { jobId, jobSeekerId: jobSeeker.id },
   });
-  if (existing) throw new Error("You have already applied to this job");
+  if (existing) throw new AppError("You have already applied to this job", 409);
 
   const application = await prisma.application.create({
     data: {
@@ -78,7 +79,7 @@ export const getApplications = async (userId: string) => {
     where: { userId },
   });
 
-  if (!jobSeeker) throw new Error("Job seeker profile not found");
+  if (!jobSeeker) throw new AppError("Job seeker profile not found", 404);
 
   const applications = await prisma.application.findMany({
     where: { jobSeekerId: jobSeeker.id },
@@ -110,15 +111,15 @@ export const withdrawApplication = async (
     where: { userId },
   });
 
-  if (!jobSeeker) throw new Error("Job seeker profile not found");
+  if (!jobSeeker) throw new AppError("Job seeker profile not found", 404);
 
   const application = await prisma.application.findUnique({
     where: { id: applicationId },
   });
 
-  if (!application) throw new Error("Application not found");
+  if (!application) throw new AppError("Application not found", 404);
   if (application.jobSeekerId !== jobSeeker.id)
-    throw new Error("You are not authorized to withdraw this application");
+    throw new AppError("You are not authorized to withdraw this application", 403);
 
   await prisma.application.delete({ where: { id: applicationId } });
 };
@@ -128,10 +129,10 @@ export const saveJob = async (userId: string, jobId: string) => {
     where: { userId },
   });
 
-  if (!jobSeeker) throw new Error("Job seeker profile not found");
+  if (!jobSeeker) throw new AppError("Job seeker profile not found", 404);
 
   const job = await prisma.job.findUnique({ where: { id: jobId } });
-  if (!job) throw new Error("Job not found");
+  if (!job) throw new AppError("Job not found", 404);
 
   const savedJob = await prisma.savedJob.create({
     data: {
@@ -149,7 +150,7 @@ export const getSavedJobs = async (userId: string) => {
     where: { userId },
   });
 
-  if (!jobSeeker) throw new Error("Job seeker profile not found");
+  if (!jobSeeker) throw new AppError("Job seeker profile not found", 404);
 
   const savedJobs = await prisma.savedJob.findMany({
     where: { jobSeekerId: jobSeeker.id },
@@ -179,13 +180,13 @@ export const unsaveJob = async (userId: string, jobId: string) => {
     where: { userId },
   });
 
-  if (!jobSeeker) throw new Error("Job seeker profile not found");
+  if (!jobSeeker) throw new AppError("Job seeker profile not found", 404);
 
   const savedJob = await prisma.savedJob.findFirst({
     where: { jobId, jobSeekerId: jobSeeker.id },
   });
 
-  if (!savedJob) throw new Error("Saved job not found");
+  if (!savedJob) throw new AppError("Saved job not found", 404);
 
   await prisma.savedJob.delete({ where: { id: savedJob.id } });
 };

@@ -2,7 +2,7 @@ import { Router } from "express";
 import rateLimit from "express-rate-limit";
 import {
   signupJobSeeker,
-  signupRecruitor,
+  signupRecruiter,
   upgradeToRecruiter,
   login,
   logout,
@@ -13,6 +13,7 @@ import { authorizeRoles, requireAuth } from "../middleware/auth.middleware";
 import { validate } from "../middleware/validate.middleware";
 import { recruiterSignupSchema } from "../validators/recruiter.schema";
 import { signupSchema } from "../validators/jobseeker.schema";
+import { loginSchema } from "../validators/auth.schema";
 
 const router = Router();
 
@@ -35,9 +36,9 @@ const signupLimiter = rateLimit({
 });
 
 router.post("/signup/jobseeker", signupLimiter, validate(signupSchema), signupJobSeeker);
-router.post("/signup/recruiter", signupLimiter, validate(recruiterSignupSchema), signupRecruitor);
-router.post("/upgrade/recruiter", requireAuth, authorizeRoles("JOB_SEEKER"), upgradeToRecruiter);
-router.post("/login", authLimiter, login);
+router.post("/signup/recruiter", signupLimiter, validate(recruiterSignupSchema), signupRecruiter);
+router.post("/upgrade/recruiter", requireAuth, authorizeRoles("JOB_SEEKER"), validate(recruiterSignupSchema), upgradeToRecruiter);
+router.post("/login", authLimiter, validate(loginSchema), login);
 router.post("/logout", logout);
 router.post("/refresh", authLimiter, refreshTokens);
 router.get("/me", requireAuth, getMe);

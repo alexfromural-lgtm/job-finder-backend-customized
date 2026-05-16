@@ -12,7 +12,7 @@ import { IS_PRODUCTION, ENV } from "../config/env";
  * Validates that email and password are provided.
  */
 export const validateCredentials = (email?: string | null, password?: string | null) => {
-  if (!email || !password) throw new Error("Email and password are required");
+  if (!email || !password) throw new AppError("Email and password are required", 400);
 };
 
 /**

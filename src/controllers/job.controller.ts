@@ -1,35 +1,45 @@
-import { Response } from "express";
+import { Response, NextFunction } from "express";
 import { AuthRequest } from "../middleware/auth.middleware";
 import * as JobService from "../services/job.service";
 import * as jobUtils from "../utils/job.utils";
-import { handleGenericError } from "../utils/job.utils";
 
-export const getJobsByRecruiter = async (req: AuthRequest, res: Response) => {
+export const getJobsByRecruiter = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     const recruiter = await jobUtils.validateRecruiterProfile(req.userId!, res);
     if (!recruiter) return;
 
     const jobs = await JobService.getJobsByRecruiter(recruiter.id);
     res.status(200).json({ data: jobs });
-  } catch (err: any) {
-    handleGenericError(err, res);
+  } catch (err) {
+    next(err);
   }
 };
 
-export const createJob = async (req: AuthRequest, res: Response) => {
+export const createJob = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     const recruiter = await jobUtils.validateRecruiterProfile(req.userId!, res);
     if (!recruiter) return;
 
-    const jobData = req.body;
-    const job = await JobService.createJob(recruiter.id, jobData);
+    const job = await JobService.createJob(recruiter.id, req.body);
     res.status(201).json({ message: "Job created successfully!", data: job });
-  } catch (err: any) {
-    handleGenericError(err, res);
+  } catch (err) {
+    next(err);
   }
 };
 
-export const getJobById = async (req: AuthRequest, res: Response) => {
+export const getJobById = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     const jobId = req.params.id;
     const job = await JobService.getJobById(jobId);
@@ -40,26 +50,33 @@ export const getJobById = async (req: AuthRequest, res: Response) => {
     }
 
     res.status(200).json({ data: job });
-  } catch (err: any) {
-    handleGenericError(err, res);
+  } catch (err) {
+    next(err);
   }
 };
 
-export const updateJob = async (req: AuthRequest, res: Response) => {
+export const updateJob = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     const recruiter = await jobUtils.validateRecruiterProfile(req.userId!, res);
     if (!recruiter) return;
 
     const jobId = req.params.id;
-    const jobData = req.body;
-    const job = await JobService.updateJob(jobId, recruiter.id, jobData);
+    const job = await JobService.updateJob(jobId, recruiter.id, req.body);
     res.status(200).json({ message: "Job updated successfully!", data: job });
-  } catch (err: any) {
-    handleGenericError(err, res);
+  } catch (err) {
+    next(err);
   }
 };
 
-export const deleteJob = async (req: AuthRequest, res: Response) => {
+export const deleteJob = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     const recruiter = await jobUtils.validateRecruiterProfile(req.userId!, res);
     if (!recruiter) return;
@@ -67,14 +84,21 @@ export const deleteJob = async (req: AuthRequest, res: Response) => {
     const jobId = req.params.id;
     await JobService.deleteJob(jobId, recruiter.id);
     res.status(200).json({ message: "Job deleted successfully!" });
-  } catch (err: any) {
-    handleGenericError(err, res);
+  } catch (err) {
+    next(err);
   }
 };
 
-export const getAllJobs = async (req: AuthRequest, res: Response) => {
+export const getAllJobs = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
   try {
-    const { category, location, search, page, pageSize } = req.query as Record<string, string | undefined>;
+    const { category, location, search, page, pageSize } = req.query as Record<
+      string,
+      string | undefined
+    >;
 
     const result = await JobService.getAllJobs({
       category,
@@ -93,7 +117,7 @@ export const getAllJobs = async (req: AuthRequest, res: Response) => {
         totalPages: result.totalPages,
       },
     });
-  } catch (err: any) {
-    handleGenericError(err, res);
+  } catch (err) {
+    next(err);
   }
 };

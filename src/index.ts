@@ -11,6 +11,7 @@ import jobRoutes from "./routes/job.route";
 import queueRoutes from "./routes/queue.route";
 import "./queue/worker"; // start the worker on server boot
 import { ENV, IS_PRODUCTION, IS_DEVELOPMENT } from "./config/env";
+import { errorHandler } from "./middleware/errorHandler.middleware";
 
 dotenv.config();
 
@@ -35,11 +36,15 @@ app.use(cors({ origin: CORS_ORIGIN, credentials: true }));
 app.use(express.json());
 app.use(cookieParser());
 
+// ── Routes ────────────────────────────────────────────────────────────────────
 app.use("/api/auth", authRoutes);
 app.use("/api/jobseeker", jobseekerRoutes);
 app.use("/api/recruiter", recruiterRoutes);
 app.use("/api/jobs", jobRoutes);
 app.use("/api/queue", queueRoutes);
+
+// ── Global error handler (must be LAST, after all routes) ─────────────────────
+app.use(errorHandler);
 
 app.listen(ENV.PORT, () => {
   console.log(`Server is running on http://localhost:${ENV.PORT} [${ENV.NODE_ENV}]`);

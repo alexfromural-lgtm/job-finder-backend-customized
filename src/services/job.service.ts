@@ -1,6 +1,8 @@
 import prisma from "../prisma/client";
+import { AppError } from "../errors/AppError";
+import type { JobInput, JobUpdateInput } from "../validators/job.schema";
 
-export const createJob = async (recruiterId: string, jobData: any) => {
+export const createJob = async (recruiterId: string, jobData: JobInput) => {
   const job = await prisma.job.create({
     data: {
       recruiterId,
@@ -27,13 +29,13 @@ export const getJobById = async (jobId: string) => {
 export const updateJob = async (
   jobId: string,
   recruiterId: string,
-  jobData: any
+  jobData: JobUpdateInput
 ) => {
   const job = await prisma.job.findUnique({ where: { id: jobId } });
 
-  if (!job) throw new Error("Job not found");
+  if (!job) throw new AppError("Job not found", 404);
   if (job.recruiterId !== recruiterId)
-    throw new Error("You are not authorized to update this job");
+    throw new AppError("You are not authorized to update this job", 403);
 
   const updated = await prisma.job.update({
     where: { id: jobId },
@@ -46,9 +48,9 @@ export const updateJob = async (
 export const deleteJob = async (jobId: string, recruiterId: string) => {
   const job = await prisma.job.findUnique({ where: { id: jobId } });
 
-  if (!job) throw new Error("Job not found");
+  if (!job) throw new AppError("Job not found", 404);
   if (job.recruiterId !== recruiterId)
-    throw new Error("You are not authorized to delete this job");
+    throw new AppError("You are not authorized to delete this job", 403);
 
   await prisma.job.delete({ where: { id: jobId } });
 };
@@ -82,7 +84,18 @@ export const getAllJobs = async (filters?: {
     ...(filters?.search && {
       OR: [
         { title: { contains: filters.search, mode: "insensitive" as const } },
-        { description: { contains: filters.search, mode: "insensitive" as const } },
+        {
+          description: {
+            contains: filters.search,
+            mode: "insensitive" as const,
+          },
+        },
+        {
+          requirements: {
+            contains: filters.search,
+            mode: "insensitive" as const,
+          },
+        },
       ],
     }),
   };
