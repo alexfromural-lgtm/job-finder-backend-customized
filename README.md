@@ -482,3 +482,170 @@ npx prisma db seed
 ## 🔗 Frontend
 
 The React frontend lives at [`../job-finder-react-customized`](../job-finder-react-customized) and proxies all `/api` calls to this service on port **5002**.
+
+---
+
+## 🔧 Upgrading Services
+
+This section documents how to safely upgrade each Docker service to a new version.
+
+---
+
+### PostgreSQL — Major Version Upgrade
+
+> ⚠️ **PostgreSQL major versions (e.g. 15 → 16) are NOT backward compatible.**
+> The on-disk data format changes between major releases. Docker will start the container but PostgreSQL will immediately `FATAL` and refuse to open the old data directory.
+
+#### Symptoms
+```
+FATAL:  database files are incompatible with server
+DETAIL: The data directory was initialized by PostgreSQL version 15, which is
+        not compatible with this version 16.x
+```
+The container will fail its healthcheck, and the backend will never start (`dependency failed to start: container job-finder-db is unhealthy`).
+
+#### Upgrade procedure (development / disposable data)
+
+1. **Edit `docker-compose.yml`** — bump the image tag on the `postgres` service:
+   ```yaml
+   # docker-compose.yml  ·  postgres service
+   image: postgres:16   # was postgres:15
+   ```
+
+2. **Stop all containers AND delete the named volume:**
+   ```bash
+   docker-compose down -v
+   ```
+   > The `-v` flag removes all named volumes declared in the compose file
+   > (`pgdata` in this project). **All existing data will be lost.**
+
+3. **Bring everything back up:**
+   ```bash
+   docker-compose up --build
+   ```
+   PostgreSQL 16 will find an empty volume and run `initdb` automatically.
+
+4. **Re-initialise the database:**
+   ```bash
+   docker exec job-finder-backend npx prisma migrate deploy
+   docker exec job-finder-backend npx prisma db seed
+   ```
+
+#### Upgrade procedure (production / data must be preserved)
+
+When you cannot afford to lose data, perform a logical dump **before** upgrading:
+
+```bash
+# 1. Dump from the running PG 15 container
+docker exec job-finder-db pg_dump -U $DB_USER -d job_finder -F c -f /tmp/job_finder_pg15.dump
+
+# 2. Copy the dump to the host
+docker cp job-finder-db:/tmp/job_finder_pg15.dump ./job_finder_pg15.dump
+
+# 3. Stop containers and drop the old volume
+docker-compose down -v
+
+# 4. Bump the image tag to postgres:16 in docker-compose.yml, then start
+docker-compose up -d postgres
+
+# 5. Wait for PG 16 to be healthy, then restore
+docker cp ./job_finder_pg15.dump job-finder-db:/tmp/
+docker exec job-finder-db pg_restore -U $DB_USER -d job_finder /tmp/job_finder_pg15.dump
+
+# 6. Start remaining services
+docker-compose up -d
+```
+
+#### Healthcheck dependency (already configured)
+
+The `backend` service is configured to wait until PostgreSQL is fully ready before starting:
+
+```yaml
+# docker-compose.yml
+backend:
+  depends_on:
+    postgres:
+      condition: service_healthy   # waits for pg_isready to pass
+
+postgres:
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d job_finder"]
+    interval: 5s
+    timeout: 5s
+    retries: 10
+    start_period: 10s
+```
+
+This eliminates the `P1001: Can't reach database server` Prisma error that occurs when the backend starts before PostgreSQL has finished initialising.
+
+---
+
+### Redis — Minor / Patch Version Upgrade
+
+Redis minor and patch upgrades are **data-compatible**; you do not need to delete the volume.
+
+1. Edit `docker-compose.yml`:
+   ```yaml
+   image: redis:7-alpine   # bump to e.g. redis:8-alpine
+   ```
+2. Pull and restart only the Redis service:
+   ```bash
+   docker-compose pull redis
+   docker-compose up -d redis
+   ```
+
+> For Redis **major** version upgrades (e.g. 7 → 8), consult the Redis release notes for breaking changes. Bull/BullMQ queue jobs stored in Redis are generally forwards-compatible, but verify before upgrading in production.
+
+---
+
+### Node.js Backend — Runtime Version Upgrade
+
+The backend runtime version is pinned in `Dockerfile`:
+
+```dockerfile
+FROM node:18        # bump to node:20, node:22, etc.
+```
+
+Steps:
+1. Update the `FROM` line in `Dockerfile`.
+2. Rebuild the image:
+   ```bash
+   docker-compose up --build backend
+   ```
+3. Verify the running version:
+   ```bash
+   docker exec job-finder-backend node --version
+   ```
+
+> Always test Prisma, Bull, and native crypto bindings after a Node.js major version bump — some native addons may need to be recompiled.
+
+---
+
+### pgAdmin4 — Version Upgrade
+
+pgAdmin stores session state in a volume but carries no critical business data.
+
+1. Edit `docker-compose.yml`:
+   ```yaml
+   image: dpage/pgadmin4:8   # pin to a specific version
+   ```
+2. Restart the service:
+   ```bash
+   docker-compose up -d pgadmin
+   ```
+
+---
+
+### General Upgrade Checklist
+
+Use this checklist for any service bump:
+
+- [ ] Read the release notes / CHANGELOG for **breaking changes**
+- [ ] Determine if the data volume is **version-compatible** (major DB bumps usually are not)
+- [ ] Back up data if the volume will be deleted
+- [ ] Update the image tag in `docker-compose.yml`
+- [ ] Run `docker-compose pull <service>` to fetch the new image
+- [ ] Run `docker-compose up -d <service>` (or `--build` for the Node.js backend)
+- [ ] Check container logs: `docker-compose logs -f <service>`
+- [ ] Run integration tests / smoke-test the API
+- [ ] Commit the `docker-compose.yml` change with the version bump noted in the commit message

@@ -6,8 +6,10 @@ services:
     ports:
       - '5002:5002'
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
     env_file:
       - .env
     environment:
@@ -28,14 +30,19 @@ services:
       - .:/app
 
   postgres:
-    image: postgres:15
+    image: postgres:16
     container_name: job-finder-db
     restart: always
     ports:
       - "5432:5432"  # This lets your computer also talk to the DB
     networks:
       - job-network
-
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d job_finder"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
     env_file:
       - .env
     environment:
