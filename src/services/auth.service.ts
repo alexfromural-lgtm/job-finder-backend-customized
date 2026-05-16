@@ -4,6 +4,7 @@ import { comparePasswords, hashPassword } from "../utils/hash";
 import { validateCredentials, checkUserExistsByEmail, generateTokensForUser } from "../utils/auth.utils";
 import { verifyRefreshToken } from "../utils/token";
 import { RecruiterSignupInput } from "../validators/recruiter.schema";
+import { AppError } from "../errors/AppError";
 
 export const signupJobSeeker = async (
   name: string,
@@ -61,8 +62,8 @@ export const upgradeToRecruiter = async (userId: string, data: RecruiterSignupIn
     include: { recruiter: true },
   });
 
-  if (!user) throw new Error("User not found");
-  if (!user.roles.includes(Role.JOB_SEEKER)) throw new Error("Only Job Seekers can upgrade");
+  if (!user) throw new AppError("User not found", 404);
+  if (!user.roles.includes(Role.JOB_SEEKER)) throw new AppError("Only Job Seekers can upgrade to Recruiter", 403);
 
   const updatedUser = await prisma.user.update({
     where: { id: userId },
@@ -87,10 +88,10 @@ export const login = async (email: string, password: string) => {
   validateCredentials(email, password);
 
   const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) throw new Error("Invalid email or password");
+  if (!user) throw new AppError("Invalid email or password", 401);
 
   const valid = await comparePasswords(password, user.password);
-  if (!valid) throw new Error("Invalid email or password"); // Should be the same error message to make it harder to guess BE logic
+  if (!valid) throw new AppError("Invalid email or password", 401); // Same message for both cases — avoids leaking which field is wrong
 
   return generateTokensForUser(user.id, user.roles);
 };
@@ -99,8 +100,8 @@ export const refreshTokens = async (refreshToken: string) => {
   const payload = verifyRefreshToken(refreshToken);
 
   const user = await prisma.user.findUnique({ where: { id: payload.userId } });
-  if (!user) throw new Error("User not found");
-  if (!user.isActive) throw new Error("Account is deactivated");
+  if (!user) throw new AppError("User not found", 404);
+  if (!user.isActive) throw new AppError("Account is deactivated", 403);
 
   return generateTokensForUser(user.id, user.roles);
 };
@@ -119,6 +120,6 @@ export const getCurrentUser = async (userId: string) => {
     },
   });
 
-  if (!user) throw new Error("User not found");
+  if (!user) throw new AppError("User not found", 404);
   return user;
 };
