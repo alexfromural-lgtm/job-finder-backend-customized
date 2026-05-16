@@ -14,9 +14,21 @@ export const validateRecruiterProfile = async (userId: string, res: Response) =>
 };
 
 /**
- * Handles generic errors with a standard 500 response.
+ * Handles job controller errors with semantically correct HTTP status codes.
+ * - 403 for authorization violations
+ * - 404 for missing jobs/resources
+ * - 500 for unexpected server errors
  */
 export const handleGenericError = (err: any, res: Response) => {
-  res.status(500).json({ error: err.message });
+  const msg: string = err?.message ?? "Unknown error";
+
+  if (msg.includes("not authorized") || msg.includes("not authorized to")) {
+    return res.status(403).json({ error: msg });
+  }
+  if (msg.includes("not found") || msg.includes("Not found")) {
+    return res.status(404).json({ error: msg });
+  }
+
+  return res.status(500).json({ error: msg });
 };
 

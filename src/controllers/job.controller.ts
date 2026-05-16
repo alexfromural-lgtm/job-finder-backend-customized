@@ -2,7 +2,6 @@ import { Response } from "express";
 import { AuthRequest } from "../middleware/auth.middleware";
 import * as JobService from "../services/job.service";
 import * as jobUtils from "../utils/job.utils";
-import { handleAuthAwareError } from "../utils/auth.utils";
 import { handleGenericError } from "../utils/job.utils";
 
 export const getJobsByRecruiter = async (req: AuthRequest, res: Response) => {
@@ -56,7 +55,7 @@ export const updateJob = async (req: AuthRequest, res: Response) => {
     const job = await JobService.updateJob(jobId, recruiter.id, jobData);
     res.status(200).json({ message: "Job updated successfully!", data: job });
   } catch (err: any) {
-    handleAuthAwareError(err, res);
+    handleGenericError(err, res);
   }
 };
 
@@ -69,7 +68,7 @@ export const deleteJob = async (req: AuthRequest, res: Response) => {
     await JobService.deleteJob(jobId, recruiter.id);
     res.status(200).json({ message: "Job deleted successfully!" });
   } catch (err: any) {
-    handleAuthAwareError(err, res);
+    handleGenericError(err, res);
   }
 };
 
