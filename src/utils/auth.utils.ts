@@ -94,6 +94,13 @@ export function setRefreshTokenCookie(res: Response, refreshToken: string) {
   res.cookie("refreshToken", refreshToken, {
     httpOnly: true,
     secure: IS_PRODUCTION,
+    // "lax" allows the cookie to be sent on top-level navigations (e.g. clicking
+    // a link from an email or an OAuth redirect back to the app), so the user
+    // doesn't lose their session on the very first request after arriving from an
+    // external site.  "strict" would block those navigations and force a new
+    // login, which is too aggressive for a standard auth flow.  Cross-site
+    // state-mutating requests (POST/PUT/DELETE) are still blocked by the browser,
+    // which covers the primary CSRF attack surface.
     sameSite: "lax",
     maxAge: ENV.REFRESH_TOKEN_MAX_AGE_MS, // 7 days
   });
@@ -108,6 +115,11 @@ export function setAccessTokenCookie(res: Response, accessToken: string) {
   res.cookie("accessToken", accessToken, {
     httpOnly: true,
     secure: IS_PRODUCTION,
+    // Same reasoning as the refresh token cookie above: "lax" lets the browser
+    // attach this cookie on top-level GET navigations from external origins
+    // (e.g. email magic-links, OAuth callbacks) without opening up cross-site
+    // state-mutating requests, striking the right balance between usability and
+    // CSRF protection.
     sameSite: "lax",
     maxAge: ENV.ACCESS_TOKEN_MAX_AGE_MS, // 15 minutes
   });

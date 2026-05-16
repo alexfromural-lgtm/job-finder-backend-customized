@@ -359,6 +359,26 @@ throw new AppError("Job not found", 404);
 | `cors()` | All routes | Restricts cross-origin requests to the origin defined by `CORS_ORIGIN`. |
 | `errorHandler` | **Last** — after all routes | Global error handler. Converts `AppError`, Prisma errors, and JWT errors to structured JSON. |
 
+### Cookie security
+
+Both `accessToken` and `refreshToken` are set as `HttpOnly; SameSite=Lax` cookies.
+
+| Attribute | Value | Why |
+|-----------|-------|-----|
+| `HttpOnly` | `true` | The cookie is invisible to JavaScript, so an XSS payload cannot steal the token even if it runs on the page. |
+| `Secure` | `true` in production | The cookie is only transmitted over HTTPS, preventing interception on the wire. |
+| `SameSite` | `Lax` | Balances usability and CSRF protection — see below. |
+
+**Why `Lax` and not `Strict`?**
+
+`SameSite=Strict` blocks the cookie on *every* cross-site navigation, including top-level `GET` requests — for example, when a user clicks a link in an email or is redirected back to the app after an OAuth flow. That means the browser silently drops the cookie and the user is effectively logged out the moment they arrive from an external origin, even though no dangerous action is being performed.
+
+`SameSite=Lax` allows the cookie on top-level `GET` navigations (the user follows a link into the app) while **still blocking it on cross-site state-mutating requests** — `POST`, `PUT`, `PATCH`, `DELETE`. Those are the requests that can cause harm in a CSRF attack, so `Lax` covers the real attack surface without breaking legitimate auth flows.
+
+> **In short:** `Lax` = "let me in through the front door, but never submit a form on my behalf from another site."
+
+---
+
 ### Rate limiting (applied per route in `src/routes/auth.route.ts`)
 
 | Limiter | Routes | Window | Max requests | Purpose |
