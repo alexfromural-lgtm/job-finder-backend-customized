@@ -6,7 +6,7 @@ import {
   generateAccessToken,
   generateRefreshToken,
 } from "./token";
-import { IS_PRODUCTION } from "../config/env";
+import { IS_PRODUCTION, ENV } from "../config/env";
 
 /**
  * Validates that email and password are provided.
@@ -95,7 +95,7 @@ export function setRefreshTokenCookie(res: Response, refreshToken: string) {
     httpOnly: true,
     secure: IS_PRODUCTION,
     sameSite: "lax",
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    maxAge: ENV.REFRESH_TOKEN_MAX_AGE_MS, // 7 days
   });
 }
 
@@ -109,6 +109,6 @@ export function setAccessTokenCookie(res: Response, accessToken: string) {
     httpOnly: true,
     secure: IS_PRODUCTION,
     sameSite: "lax",
-    maxAge: 15 * 60 * 1000, // 15 minutes
+    maxAge: ENV.ACCESS_TOKEN_MAX_AGE_MS, // 15 minutes
   });
 }
