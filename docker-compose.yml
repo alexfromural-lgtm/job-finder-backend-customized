@@ -3,6 +3,7 @@ services:
   backend:
     build: .
     container_name: job-finder-backend
+    restart: unless-stopped
     ports:
       - '5002:5002'
     depends_on:
@@ -15,6 +16,7 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL}
       NODE_ENV: ${NODE_ENV}
+      PORT: ${PORT}
       ACCESS_TOKEN_SECRET: ${ACCESS_TOKEN_SECRET}
       REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET}
       ACCESS_TOKEN_EXPIRES_IN: ${ACCESS_TOKEN_EXPIRES_IN}
@@ -22,57 +24,62 @@ services:
       REDIS_URL: ${REDIS_URL}
       QUEUE_CONCURRENCY: ${QUEUE_CONCURRENCY}
       CORS_ORIGIN: ${CORS_ORIGIN}
-      PORT: ${PORT}
     networks:
       - job-network
-
     volumes:
       - .:/app
 
   postgres:
-    image: postgres:16
+    image: postgres:16-alpine
     container_name: job-finder-db
-    restart: always
+    restart: unless-stopped
     ports:
-      - "5432:5432"  # This lets your computer also talk to the DB
-    networks:
-      - job-network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d job_finder"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-      start_period: 10s
+      - "5432:5432"
     env_file:
       - .env
     environment:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASS}
-      POSTGRES_DB: job_finder
+      POSTGRES_DB: ${DB_NAME}
     volumes:
       - pgdata:/var/lib/postgresql/data
+    networks:
+      - job-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
   pgadmin:
     image: dpage/pgadmin4
     container_name: job-finder-pgadmin
+    restart: unless-stopped
     ports:
     - "5050:80"
+    env_file:
+      - .env
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@example.com
-      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
     depends_on:
       - postgres
-    restart: unless-stopped
     networks:
       - job-network
 
   redis:
     image: redis:7-alpine
     container_name: job-finder-redis
+    restart: unless-stopped
     ports:
       - "6379:6379"
     networks:
       - job-network
-    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
 networks:
   job-network:
