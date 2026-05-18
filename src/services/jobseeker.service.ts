@@ -134,8 +134,10 @@ export const saveJob = async (userId: string, jobId: string) => {
   const job = await prisma.job.findUnique({ where: { id: jobId } });
   if (!job) throw new AppError("Job not found", 404);
 
-  const savedJob = await prisma.savedJob.create({
-    data: {
+  const savedJob = await prisma.savedJob.upsert({
+    where: { jobId_jobSeekerId: { jobId, jobSeekerId: jobSeeker.id } },
+    update: {},  // already saved — no-op
+    create: {
       jobId,
       jobSeekerId: jobSeeker.id,
     },
