@@ -112,6 +112,7 @@ export const logout = async (
       httpOnly: true,
       secure: IS_PRODUCTION,
       sameSite: "lax" as const,
+      path: "/",  // Must match the path used in Set-Cookie, otherwise clear is ignored
     };
     res.clearCookie("refreshToken", cookieOpts);
     res.clearCookie("accessToken", cookieOpts);

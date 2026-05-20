@@ -102,6 +102,7 @@ export function setRefreshTokenCookie(res: Response, refreshToken: string) {
     // state-mutating requests (POST/PUT/DELETE) are still blocked by the browser,
     // which covers the primary CSRF attack surface.
     sameSite: "lax",
+    path: "/",  // Must be explicit — defaults to the request path otherwise
     maxAge: ENV.REFRESH_TOKEN_MAX_AGE_MS, // 7 days
   });
 }
@@ -121,6 +122,7 @@ export function setAccessTokenCookie(res: Response, accessToken: string) {
     // state-mutating requests, striking the right balance between usability and
     // CSRF protection.
     sameSite: "lax",
+    path: "/",  // Must be explicit — defaults to the request path otherwise
     maxAge: ENV.ACCESS_TOKEN_MAX_AGE_MS, // 15 minutes
   });
 }
